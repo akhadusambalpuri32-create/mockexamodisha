@@ -1,0 +1,50 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "Represents the user's progress, credentials, selected tracks, and game tokens.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "description": "Firebase Auth unique identifier"
+        },
+        "name": {
+          "type": "string",
+          "description": "The displayName of the user"
+        },
+        "email": {
+          "type": "string",
+          "description": "User email address"
+        },
+        "examTarget": {
+          "type": "string",
+          "description": "The active track or target syllabus selected"
+        },
+        "district": {
+          "type": "string",
+          "description": "The home base district of Odisha"
+        },
+        "streak": {
+          "type": "number",
+          "description": "Consecutive days of mock studies completed"
+        },
+        "coins": {
+          "type": "number",
+          "description": "Gamified coins earned solving test papers"
+        },
+        "xp": {
+          "type": "number",
+          "description": "Experience points indicating scholarly merit"
+        }
+      },
+      "required": ["uid", "name", "email", "examTarget", "district", "streak", "coins", "xp"]
+    }
+  },
+  "firestore": {
+    "users/{uid}": {
+      "schema": "User",
+      "description": "The user progress doc mapped to their UID"
+    }
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "name": "Odisha Exam",
+  "description": "Premium educational web application for Odisha competitive and academic board exams, featuring adaptive mock tests, live ranking, comprehensive result analytics, and AI-driven study tools.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

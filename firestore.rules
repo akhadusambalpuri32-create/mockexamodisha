@@ -1,0 +1,43 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Default safety catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    // Rules for User Profile Mappings
+    match /users/{uid} {
+      allow read: if isOwner(uid);
+      allow create: if isOwner(uid) && isValidUser(request.resource.data);
+      allow update: if isOwner(uid) && isValidUser(request.resource.data);
+      allow delete: if false;
+    }
+
+    function isValidUser(data) {
+      return data.keys().hasAll(['uid', 'name', 'email', 'examTarget', 'district', 'streak', 'coins', 'xp'])
+        && data.keys().size() == 8
+        && data.uid is string
+        && data.uid.size() <= 128
+        && data.name is string
+        && data.name.size() <= 100
+        && data.email is string
+        && data.email.size() <= 150
+        && data.examTarget is string
+        && data.examTarget.size() <= 100
+        && data.district is string
+        && data.district.size() <= 100
+        && data.streak is number
+        && data.coins is number
+        && data.xp is number;
+    }
+  }
+}

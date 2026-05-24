@@ -137,6 +137,11 @@ export default function App() {
               });
               if (userDoc && userDoc.exists()) {
                 docData = userDoc.data();
+                const authEmail = (firebaseUser.email || docData.email || "").toLowerCase();
+                if (authEmail === "akhadusambalpuri32@gmail.com" && docData.role !== "admin") {
+                  docData.role = "admin";
+                  setDoc(doc(db, "users", firebaseUser.uid), { role: "admin" }, { merge: true }).catch(() => {});
+                }
                 // Cache locally
                 localStorage.setItem(`kalinga_user_${firebaseUser.uid}`, JSON.stringify(docData));
               }
@@ -154,6 +159,7 @@ export default function App() {
 
             // Safe fallback if even localStorage is empty
             if (!docData) {
+              const authEmail = (firebaseUser.email || "").toLowerCase();
               docData = {
                 name: firebaseUser.displayName || "Scholarly Aspirant",
                 email: firebaseUser.email || "",
@@ -163,12 +169,19 @@ export default function App() {
                 coins: 100,
                 xp: 10,
                 streak: 1,
+                role: authEmail === "akhadusambalpuri32@gmail.com" ? "admin" : "student",
                 badges: [
                   { id: "b-onboarding", title: "Biju Shravak", description: "Registered profile successfully on platform", icon: "GraduationCap", unlockedAt: new Date().toLocaleDateString() }
                 ],
                 savedNotes: [],
                 testHistory: []
               };
+            }
+
+            // Ensure admin is synced to localStorage auth flag
+            const isSetAdmin = docData.role === "admin" || (firebaseUser.email && firebaseUser.email.toLowerCase() === "akhadusambalpuri32@gmail.com");
+            if (isSetAdmin) {
+              localStorage.setItem("orisha_admin_authenticated", "true");
             }
 
             // Read guest's cached test history to merge, to prevent losing newly given tests when switching from Guest to Authenticated
@@ -220,7 +233,8 @@ export default function App() {
               badges: mergedBadges,
               savedNotes: mergedNotes,
               testHistory: mergedHistory,
-              isGuest: false
+              isGuest: false,
+              role: isSetAdmin ? "admin" : (docData.role || "student")
             });
             setAppState("dashboard");
             setActiveTab("home");
@@ -361,9 +375,8 @@ export default function App() {
       }
 
       if (loadedData) {
-        const merged = mergeWithLocalExams(loadedData);
-        setExamsData(merged);
-        localStorage.setItem("kalinga_custom_exams_db", JSON.stringify(merged));
+        setExamsData(loadedData);
+        localStorage.setItem("kalinga_custom_exams_db", JSON.stringify(loadedData));
       } else {
         // Build dynamic fallback using cached client-side db or the custom mocks
         const cachedExams = localStorage.getItem("kalinga_custom_exams_db");
@@ -806,6 +819,7 @@ export default function App() {
   };
 
   const handleLogOut = async () => {
+    localStorage.removeItem("orisha_admin_authenticated");
     try {
       await signOut(auth);
     } catch (err) {
@@ -1242,14 +1256,14 @@ export default function App() {
               {activeTab === "admin-portal" && (
                 <AdminPanel 
                   exams={examsData}
+                  userProfile={userProfile}
                   onReloadExams={async () => {
                     try {
                       const response = await fetch("/api/exams-data");
                       if (response.ok) {
                         const data = await response.json();
-                        const merged = mergeWithLocalExams(data);
-                        setExamsData(merged);
-                        localStorage.setItem("kalinga_custom_exams_db", JSON.stringify(merged));
+                        setExamsData(data);
+                        localStorage.setItem("kalinga_custom_exams_db", JSON.stringify(data));
                       }
                     } catch (e) {
                       console.error("Failed to reload dynamic exams database:", e);

@@ -141,7 +141,13 @@ export default function AuthScreen({ onLoginSuccess, onExit }: AuthScreenProps) 
         // Sync with Firestore in quiet background thread so UI is NOT blocked at all
         getDoc(userDocRef).then((snap) => {
           if (snap.exists()) {
-            localStorage.setItem(`kalinga_user_${uid}`, JSON.stringify(snap.data()));
+            const data = snap.data();
+            const emailLower = (data.email || userEmail || "").toLowerCase();
+            if (emailLower === "akhadusambalpuri32@gmail.com" && data.role !== "admin") {
+              data.role = "admin";
+              setDoc(userDocRef, { role: "admin" }, { merge: true }).catch(() => {});
+            }
+            localStorage.setItem(`kalinga_user_${uid}`, JSON.stringify(data));
           }
         }).catch((err) => {
           handleFirestoreError(err, OperationType.GET, `users/${uid}`);
@@ -154,6 +160,7 @@ export default function AuthScreen({ onLoginSuccess, onExit }: AuthScreenProps) 
 
     // 2. Fallback dynamic payload if cache is empty
     const defaultName = providerDisplayName || name || userEmail?.split("@")[0] || "Aspirant " + uid.substring(0, 4);
+    const isAdminEmail = (userEmail || "").toLowerCase() === "akhadusambalpuri32@gmail.com";
     const userProfilePayload = {
       uid,
       name: defaultName,
@@ -162,7 +169,8 @@ export default function AuthScreen({ onLoginSuccess, onExit }: AuthScreenProps) 
       district: district || "Khordha",
       streak: 1,
       coins: 100,
-      xp: 10
+      xp: 10,
+      role: isAdminEmail ? "admin" : "student"
     };
 
     // 3. Fast Promise Race - Wait maximum of 500ms for database snapshot, otherwise login immediately with fallback!
@@ -176,6 +184,11 @@ export default function AuthScreen({ onLoginSuccess, onExit }: AuthScreenProps) 
       const snap = await Promise.race([getDocPromise, timeoutPromise]);
       if (snap && snap.exists()) {
         const docData = snap.data();
+        const emailLower = (docData.email || userEmail || "").toLowerCase();
+        if (emailLower === "akhadusambalpuri32@gmail.com" && docData.role !== "admin") {
+          docData.role = "admin";
+          setDoc(userDocRef, { role: "admin" }, { merge: true }).catch(() => {});
+        }
         localStorage.setItem(`kalinga_user_${uid}`, JSON.stringify(docData));
         onLoginSuccess(
           docData.name || defaultName,

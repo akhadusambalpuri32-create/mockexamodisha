@@ -13,7 +13,7 @@ import {
   onAuthStateChanged
 } from "firebase/auth";
 import {
-  getFirestore,
+  initializeFirestore,
   doc,
   getDoc,
   setDoc,
@@ -61,8 +61,8 @@ const app = initializeApp(firebaseConfig);
 
 // Initialize Services
 export const db = (firebaseConfig.firestoreDatabaseId && firebaseConfig.firestoreDatabaseId !== "(default)")
-  ? getFirestore(app, firebaseConfig.firestoreDatabaseId)
-  : getFirestore(app);
+  ? initializeFirestore(app, { experimentalForceLongPolling: true }, firebaseConfig.firestoreDatabaseId)
+  : initializeFirestore(app, { experimentalForceLongPolling: true });
 export const auth = getAuth(app);
 
 // Suppress benign internal gRPC idle stream cancellation messages in the console

@@ -341,7 +341,9 @@ export default function StudentDashboard({
   // Safe category counting helper
   const getSubExamCount = (cat: "board" | "teaching" | "others") => {
     if (cat === "others") {
-      return 1; // Only DCA & Computer skills remain
+      const activeIds = ["opsc_ocs", "osssc_ri", "ossc_cgl", "police_si", "computer_skill"];
+      const activeExamsList = [...(exams.competitive || []), ...(exams.others || [])];
+      return activeIds.filter(subId => activeExamsList.some(e => e.subCategory === subId || e.id === subId)).length;
     }
     return exams[cat]?.length || 0;
   };
@@ -693,7 +695,7 @@ export default function StudentDashboard({
                   ? ["cbse", "bse", "chse"]
                   : selectedCategory === "teaching"
                     ? ["otet", "osstet", "ossc_tgt", "ssb_tgt", "jt", "pet", "bed_entrance", "deled_entrance"]
-                    : ["computer_skill"];
+                    : ["opsc_ocs", "osssc_ri", "ossc_cgl", "police_si", "computer_skill"];
 
                 return activeIds.map((subId) => {
                   const meta = SUB_EXAMS_META[subId];

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { 
   ShieldAlert, Database, PlusCircle, Bell, BookOpen, Sparkles, UploadCloud, CheckCircle, HelpCircle, FileText, Loader2, RefreshCw, Lock, User, Trash2, Edit3, Calendar, Settings
 } from "lucide-react";
+import { auth, signInWithEmailAndPassword, createUserWithEmailAndPassword } from "../firebase";
 
 interface AdminPanelProps {
   exams: {
@@ -11,9 +12,10 @@ interface AdminPanelProps {
     others: any[];
   };
   onReloadExams: () => Promise<void>;
+  userProfile?: any;
 }
 
-export default function AdminPanel({ exams, onReloadExams }: AdminPanelProps) {
+export default function AdminPanel({ exams, onReloadExams, userProfile }: AdminPanelProps) {
   // Authentication states
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(() => {
     return localStorage.getItem("orisha_admin_authenticated") === "true";
@@ -21,6 +23,15 @@ export default function AdminPanel({ exams, onReloadExams }: AdminPanelProps) {
   const [inputAdminId, setInputAdminId] = useState("");
   const [inputPassword, setInputPassword] = useState("");
   const [loginError, setLoginError] = useState("");
+
+  const [isSyncingFirebase, setIsSyncingFirebase] = useState(false);
+
+  useEffect(() => {
+    if (userProfile && (userProfile.role === "admin" || (userProfile.email && userProfile.email.toLowerCase() === "akhadusambalpuri32@gmail.com"))) {
+      setIsAdminLoggedIn(true);
+      localStorage.setItem("orisha_admin_authenticated", "true");
+    }
+  }, [userProfile]);
 
   const [activeTab, setActiveTab] = useState<"telemetry" | "sheet-parser" | "mcq-creator" | "notifications">("sheet-parser");
 
@@ -46,7 +57,7 @@ export default function AdminPanel({ exams, onReloadExams }: AdminPanelProps) {
   const [notifBody, setNotifBody] = useState("");
 
   // ====== AI SHEET PARSER STATE ======
-  const [examCategory, setExamCategory] = useState<"board" | "teaching" | "competitive" | "others">("teaching");
+  const [examCategory, setExamCategory] = useState<"board" | "teaching" | "others">("teaching");
   const [selectedExamId, setSelectedExamId] = useState("");
   const [selectedTestId, setSelectedTestId] = useState("new");
   
@@ -157,7 +168,8 @@ export default function AdminPanel({ exams, onReloadExams }: AdminPanelProps) {
   };
 
   const handleReplaceRedirect = (test: any) => {
-    setExamCategory(test.category);
+    const cat = (test.category === "competitive" || test.category === "others") ? "others" : test.category;
+    setExamCategory(cat);
     setSelectedExamId(test.examId);
     setSelectedTestId(test.id);
     setNewTestTitle(test.title);
@@ -175,7 +187,9 @@ export default function AdminPanel({ exams, onReloadExams }: AdminPanelProps) {
 
   // Set default selectedExamId when examCategory changes
   useEffect(() => {
-    const list = exams[examCategory] || [];
+    const list = examCategory === "others"
+      ? [...(exams.competitive || []), ...(exams.others || [])]
+      : (exams[examCategory] || []);
     if (list.length > 0) {
       setSelectedExamId(list[0].id);
     } else {
@@ -186,7 +200,9 @@ export default function AdminPanel({ exams, onReloadExams }: AdminPanelProps) {
   // Set default test values based on the selected exam (like negative marking = 0 for OTET/OSSTET)
   useEffect(() => {
     if (!selectedExamId) return;
-    const list = exams[examCategory] || [];
+    const list = examCategory === "others"
+      ? [...(exams.competitive || []), ...(exams.others || [])]
+      : (exams[examCategory] || []);
     const found = list.find(e => e.id === selectedExamId);
     if (found) {
       // BSE / CHSE / OTET / OSSTET have no negative marking, adjust dynamically!
@@ -325,7 +341,9 @@ export default function AdminPanel({ exams, onReloadExams }: AdminPanelProps) {
   };
 
   // Populate dynamic tests list for a selected exam
-  const currentExamList = exams[examCategory] || [];
+  const currentExamList = examCategory === "others"
+    ? [...(exams.competitive || []), ...(exams.others || [])]
+    : (exams[examCategory] || []);
   const currentExamObj = currentExamList.find(e => e.id === selectedExamId);
   const availableTests = currentExamObj?.tests || [];
 
@@ -352,15 +370,74 @@ export default function AdminPanel({ exams, onReloadExams }: AdminPanelProps) {
     setNotifBody("");
   };
 
-  const handleLoginSubmit = (e: React.FormEvent) => {
+  const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const cleanId = inputAdminId.trim().toLowerCase();
-    if ((cleanId === "akhadusambalpuri32@gmail.com" || cleanId === "admin") && inputPassword === "odisha2026") {
-      setIsAdminLoggedIn(true);
-      localStorage.setItem("orisha_admin_authenticated", "true");
-      setLoginError("");
-    } else {
-      setLoginError("Incorrect Credentials. Use Email ID: akhadusambalpuri32@gmail.com & Password: odisha2026");
+    setLoginError("");
+    setIsSyncingFirebase(true);
+
+    try {
+      // 1. Support the hardcoded credential or alternate admin ID to log in instantly
+      if ((cleanId === "akhadusambalpuri32@gmail.com" || cleanId === "admin") && inputPassword === "odisha2026") {
+        setIsAdminLoggedIn(true);
+        localStorage.setItem("orisha_admin_authenticated", "true");
+        
+        // Quietly register/sign-in this account into Firebase so it's backed up by Firebase Authentication!
+        try {
+          const checkEmail = cleanId === "admin" ? "akhadusambalpuri32@gmail.com" : cleanId;
+          await signInWithEmailAndPassword(auth, checkEmail, "odisha2026")
+            .then(() => {
+              console.log("🟢 Authed Admin Firebase Account successfully in the background.");
+            })
+            .catch(async (err) => {
+              if (err.code === "auth/user-not-found" || err.code === "auth/invalid-credential" || err.code === "auth/invalid-email") {
+                console.log("Registering Admin Account on Firebase Auth...");
+                try {
+                  await createUserWithEmailAndPassword(auth, checkEmail, "odisha2026");
+                  console.log("🚀 Registered and signed up new Admin in Firebase Auth successfully!");
+                } catch (signupErr) {
+                  console.warn("Could not auto-register admin in Firebase Auth:", signupErr);
+                }
+              }
+            });
+        } catch (bgErr) {
+          console.warn("Background Firebase register cycle silent failure:", bgErr);
+        }
+        setIsSyncingFirebase(false);
+        return;
+      }
+
+      // 2. Generic Email based Firebase authentication verification
+      const isEmail = cleanId.includes("@");
+      if (isEmail) {
+        try {
+          const userCredential = await signInWithEmailAndPassword(auth, cleanId, inputPassword);
+          const emailLower = (userCredential.user.email || "").toLowerCase();
+          
+          if (emailLower === "akhadusambalpuri32@gmail.com") {
+            setIsAdminLoggedIn(true);
+            localStorage.setItem("orisha_admin_authenticated", "true");
+            console.log("🔓 Firebase Verified Administration Session");
+          } else {
+            // Also let other Firestore users with 'admin' role log in!
+            // We can check if isSyncingFirebase and get document
+            setLoginError("This Firebase account is not authorized as an administrator.");
+          }
+        } catch (err: any) {
+          console.error("Firebase Login Error: ", err);
+          let errMsg = err.message || String(err);
+          if (err.code === "auth/invalid-credential") {
+            errMsg = "Invalid password or email. Correct default is: akhadusambalpuri32@gmail.com and password: odisha2026";
+          }
+          setLoginError(errMsg);
+        }
+      } else {
+        setLoginError("Invalid format. Use Email: akhadusambalpuri32@gmail.com and password: odisha2026");
+      }
+    } catch (outerErr: any) {
+      setLoginError(outerErr.message || String(outerErr));
+    } finally {
+      setIsSyncingFirebase(false);
     }
   };
 
@@ -423,12 +500,17 @@ export default function AdminPanel({ exams, onReloadExams }: AdminPanelProps) {
             </div>
           )}
 
-          <button
+           <button
             type="submit"
-            className="w-full py-3 bg-rose-700 hover:bg-rose-800 text-white font-black text-xs rounded-xl shadow-md transition-all active:scale-98 cursor-pointer flex items-center justify-center gap-2"
+            disabled={isSyncingFirebase}
+            className="w-full py-3 bg-rose-700 hover:bg-rose-800 disabled:bg-rose-450 disabled:opacity-75 text-white font-black text-xs rounded-xl shadow-md transition-all active:scale-98 cursor-pointer flex items-center justify-center gap-2"
           >
-            <Lock className="h-4 w-4 shrink-0" />
-            <span>Unlock Secure Console</span>
+            {isSyncingFirebase ? (
+              <Loader2 className="h-4 w-4 animate-spin shrink-0" />
+            ) : (
+              <Lock className="h-4 w-4 shrink-0" />
+            )}
+            <span>{isSyncingFirebase ? "Securing Auth Connection..." : "Unlock Secure Console"}</span>
           </button>
         </form>
 
@@ -542,10 +624,9 @@ export default function AdminPanel({ exams, onReloadExams }: AdminPanelProps) {
                     onChange={(e) => setExamCategory(e.target.value as any)}
                     className="w-full p-2.5 bg-white border border-slate-200 rounded-xl outline-none text-slate-700 font-semibold"
                   >
-                    <option value="board">Class Board Exams (BSE/CHSE)</option>
-                    <option value="teaching">Teacher Eligibility (OTET/OSSTET)</option>
-                    <option value="competitive">Competitive Exams (OPSC/OSSSC)</option>
-                    <option value="others">Other Local Recruitments</option>
+                    <option value="board">🏫 Board Exams (BSE/CHSE/CBSE)</option>
+                    <option value="teaching">👨‍🏫 Teaching Exams (OTET/OSSTET/TGT/JT)</option>
+                    <option value="others">🚀 Other Exams (OPSC/OSSSC/DCA & Skills)</option>
                   </select>
                 </div>
 

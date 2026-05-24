@@ -4,7 +4,7 @@ import fs from "fs";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI, Type } from "@google/genai";
 import { initializeApp } from "firebase/app";
-import { getFirestore, doc, getDoc, setDoc } from "firebase/firestore";
+import { initializeFirestore, doc, getDoc, setDoc } from "firebase/firestore";
 
 const app = express();
 const PORT = 3000;
@@ -17,8 +17,10 @@ try {
   if (fs.existsSync(configPath)) {
     const firebaseConfig = JSON.parse(fs.readFileSync(configPath, "utf-8"));
     firebaseApp = initializeApp(firebaseConfig);
-    serverDb = getFirestore(firebaseApp);
-    console.log("🟢 [FIREBASE SERVER] Initialized successfully in backend.");
+    serverDb = initializeFirestore(firebaseApp, { 
+      experimentalForceLongPolling: true 
+    });
+    console.log("🟢 [FIREBASE SERVER] Initialized successfully with experimentalForceLongPolling in backend.");
   }
 } catch (error) {
   console.error("❌ [FIREBASE SERVER] Failed to initialize:", error);

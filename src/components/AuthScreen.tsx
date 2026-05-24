@@ -143,7 +143,9 @@ export default function AuthScreen({ onLoginSuccess, onExit }: AuthScreenProps) 
           if (snap.exists()) {
             localStorage.setItem(`kalinga_user_${uid}`, JSON.stringify(snap.data()));
           }
-        }).catch(() => {});
+        }).catch((err) => {
+          handleFirestoreError(err, OperationType.GET, `users/${uid}`);
+        });
         return;
       } catch (cacheErr) {
         console.warn("Local cache read error, proceeding to DB:", cacheErr);
@@ -165,7 +167,10 @@ export default function AuthScreen({ onLoginSuccess, onExit }: AuthScreenProps) 
 
     // 3. Fast Promise Race - Wait maximum of 500ms for database snapshot, otherwise login immediately with fallback!
     try {
-      const getDocPromise = getDoc(userDocRef);
+      const getDocPromise = getDoc(userDocRef).catch((err) => {
+        handleFirestoreError(err, OperationType.GET, `users/${uid}`);
+        throw err;
+      });
       const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 500));
       
       const snap = await Promise.race([getDocPromise, timeoutPromise]);
@@ -186,7 +191,9 @@ export default function AuthScreen({ onLoginSuccess, onExit }: AuthScreenProps) 
 
     // Save fallback data in background
     localStorage.setItem(`kalinga_user_${uid}`, JSON.stringify(userProfilePayload));
-    setDoc(userDocRef, userProfilePayload).catch(() => {});
+    setDoc(userDocRef, userProfilePayload).catch((err) => {
+      handleFirestoreError(err, OperationType.WRITE, `users/${uid}`);
+    });
 
     // Login user immediately
     onLoginSuccess(

@@ -6,7 +6,7 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { UserProfile, Exam, Question, SavedNote } from "./types";
-import { auth, db, doc, getDoc, setDoc, onAuthStateChanged, signOut, testConnection } from "./firebase";
+import { auth, db, doc, getDoc, setDoc, onAuthStateChanged, signOut, testConnection, handleFirestoreError, OperationType } from "./firebase";
 
 // Component imports
 import LandingPage from "./components/LandingPage";
@@ -131,14 +131,17 @@ export default function App() {
           try {
             let docData: any = null;
             try {
-              const userDoc = await getDoc(doc(db, "users", firebaseUser.uid));
+              const userDoc = await getDoc(doc(db, "users", firebaseUser.uid)).catch((err) => {
+                handleFirestoreError(err, OperationType.GET, `users/${firebaseUser.uid}`);
+                throw err;
+              });
               if (userDoc && userDoc.exists()) {
                 docData = userDoc.data();
                 // Cache locally
                 localStorage.setItem(`kalinga_user_${firebaseUser.uid}`, JSON.stringify(docData));
               }
             } catch (offlineErr) {
-              console.warn("Could not get document from server (offline). Checking localStorage fallback...", offlineErr);
+              console.warn("Could not get document from server. Checking localStorage fallback...", offlineErr);
               const cached = localStorage.getItem(`kalinga_user_${firebaseUser.uid}`);
               if (cached) {
                 try {
@@ -293,6 +296,7 @@ export default function App() {
           testHistory: userProfile.testHistory
         }, { merge: true }).catch((err) => {
           console.error("Failed to sync profile to cloud Firestore:", err);
+          handleFirestoreError(err, OperationType.WRITE, `users/${uid}`);
         });
       }
     }

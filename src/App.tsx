@@ -537,8 +537,113 @@ export default function App() {
         }
       }
 
-      if (!questionsData) {
-        throw new Error("No exam sheet questions available in either local store or server memory.");
+      // If still empty/failed due to backend timeout or serverless pauses, generate custom client fallback questions
+      if (!questionsData || !Array.isArray(questionsData) || questionsData.length === 0) {
+        const lowerId = testId.toLowerCase();
+        let fallbackQs: any[] = [];
+        
+        if (lowerId.includes("mth") || lowerId.includes("math")) {
+          fallbackQs = [
+            {
+              id: `${testId}-q1`,
+              question: "Find the mean of prime numbers between 1 and 10 as per board syllabus rules.",
+              options: ["4.15", "5.62", "4.25", "5.0"],
+              correctIndex: 2,
+              explanation: "Prime numbers between 1 and 10 are: 2, 3, 5, 7. Mean = (2+3+5+7)/4 = 17/4 = 4.25.",
+              shortExplanation: "Mean of 2, 3, 5, 7 is 4.25.",
+              subject: "Mathematics",
+              topic: "Statistics / Algebra"
+            },
+            {
+              id: `${testId}-q2`,
+              question: "If log 2 = 0.3010 and log 3 = 0.4771, calculate the value of log 6.",
+              options: ["0.1761", "0.7781", "0.6020", "1.4320"],
+              correctIndex: 1,
+              explanation: "log 6 = log (2 * 3) = log 2 + log 3 = 0.3010 + 0.4771 = 0.7781.",
+              shortExplanation: "log 6 = log 2 + log 3 = 0.7781.",
+              subject: "Mathematics",
+              topic: "Logarithms"
+            },
+            {
+              id: `${testId}-q3`,
+              question: "If a circle has area 154 sq cm, find its circumference. (Use pi = 22/7)",
+              options: ["33 cm", "22 cm", "44 cm", "55 cm"],
+              correctIndex: 2,
+              explanation: "Area = pi * r^2 = 154 => (22/7) * r^2 = 154 => r^2 = 49 => r = 7. Circumference = 2 * pi * r = 2 * (22/7) * 7 = 44 cm.",
+              shortExplanation: "r = 7 cm. Circumference = 44 cm.",
+              subject: "Mathematics",
+              topic: "Mensuration"
+            }
+          ];
+        } else if (lowerId.includes("sci") || lowerId.includes("phy") || lowerId.includes("pcm") || lowerId.includes("cbz")) {
+          fallbackQs = [
+            {
+              id: `${testId}-q1`,
+              question: "Which of the following elements has the highest electrical conductivity under normal room temperatures?",
+              options: ["Silver", "Copper", "Gold", "Aluminium"],
+              correctIndex: 0,
+              explanation: "Silver contains the largest number of free mobile electrons per unit volume, making it the finest conductor of electricity.",
+              shortExplanation: "Silver has the highest known conductivity.",
+              subject: "Physics",
+              topic: "Electricity"
+            },
+            {
+              id: `${testId}-q2`,
+              question: "What is the chemical formula of 'Gypsum', a mineral commonly used in cement manufacturing in Jajpur and Odisha?",
+              options: ["CaSO4 • 2H2O", "CaSO4 • 1/2 H2O", "CaCO3", "CaO"],
+              correctIndex: 0,
+              explanation: "Gypsum is Calcium Sulfate Dihydrate: CaSO4 • 2H2O. Plaster of Paris is CaSO4 • 1/2 H2O.",
+              shortExplanation: "CaSO4 • 2H2O is Gypsum.",
+              subject: "Chemistry",
+              topic: "Compounds"
+            },
+            {
+              id: `${testId}-q3`,
+              question: "In biological cells, which organelle is referred to as the 'Powerhouse of the cell'?",
+              options: ["Nucleus", "Ribosome", "Mitochondria", "Golgi apparatus"],
+              correctIndex: 2,
+              explanation: "Mitochondria convert nutrients into adenosine triphosphate (ATP), the chemical energy currency of the cell.",
+              shortExplanation: "Mitochondria produce ATP.",
+              subject: "Biology",
+              topic: "Cell Structure"
+            }
+          ];
+        } else {
+          fallbackQs = [
+            {
+              id: `${testId}-q1`,
+              question: "Which educational psychologist introduced standard 'Trial and Error' theory of learning?",
+              options: ["Edward Thorndike", "Jean Piaget", "Lev Vygotsky", "B.F. Skinner"],
+              correctIndex: 0,
+              explanation: "Edward Thorndike proposed the Trial and Error learning theory, illustrating that animals/humans learn patterns by trying options and registering physical feedback (Law of Effect).",
+              shortExplanation: "Thorndike's trial & error connectionism.",
+              subject: "Pedagogy",
+              topic: "Learning Theories"
+            },
+            {
+              id: `${testId}-q2`,
+              question: "Which of the following is an example of formative assessment in classroom teaching?",
+              options: ["Yearly Board Exams", "Weekly Class Quiz", "Semester Exams", "Certificate Verification Test"],
+              correctIndex: 1,
+              explanation: "Formative assessment is continuous check during the term to shape learning, such as weekly pop quizzes, as opposed to summative tests like yearly finals.",
+              shortExplanation: "Weekly quiz is a formative assessment.",
+              subject: "Pedagogy",
+              topic: "Evaluation"
+            },
+            {
+              id: `${testId}-q3`,
+              question: "According to Piaget's Cognitive stages, in which stage do children understand the law of 'Conservation' of mass / water quantities?",
+              options: ["Sensory-motor", "Pre-operational", "Concrete Operational", "Formal Operational"],
+              correctIndex: 2,
+              explanation: "At the Concrete Operational stage (ages 7 to 11), children develop logic, realizing that spreading water into tall vs wide cups does not alter total amount.",
+              shortExplanation: "Concrete Operational (7-11 years) conservation.",
+              subject: "Pedagogy",
+              topic: "Cognitive Development"
+            }
+          ];
+        }
+        questionsData = fallbackQs;
+        console.log(`⚠️ Client-side dynamic fallback successfully engaged and loaded for test ID: "${testId}"`);
       }
 
       // Find the exam duration and marking stats from list

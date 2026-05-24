@@ -504,6 +504,20 @@ let QUESTIONS_DATABASE: Record<string, any[]> = {
 const EXAMS_FILE = path.join(process.cwd(), "custom_exams_db.json");
 const QUESTIONS_FILE = path.join(process.cwd(), "custom_questions_db.json");
 
+// Direct Promise racing to enforce strict bounds on Cloud Firestore operations, 
+// completely preventing backend hanging or Gateway Timeouts on serverless Vercel Lambdas.
+async function withTimeout<T>(promise: Promise<T>, ms: number = 1200): Promise<T> {
+  let timeoutId: any;
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(() => {
+      reject(new Error(`Firestore query exceeded deadline limit of ${ms}ms`));
+    }, ms);
+  });
+  return Promise.race([promise, timeoutPromise]).finally(() => {
+    if (timeoutId) clearTimeout(timeoutId);
+  });
+}
+
 async function loadPersistedData() {
   // 1. Read files locally from disk as base/initial fallback
   try {
@@ -532,10 +546,10 @@ async function loadPersistedData() {
     console.error("❌ [PERSISTENCE] Error loading QUESTIONS_DATABASE from disk:", err);
   }
 
-  // 2. Fetch live config overrides from Firestore Cloud Database (extremely robust on Vercel!)
+  // 2. Fetch live config overrides from Firestore Cloud Database (extremely robust withTimeout constraints)
   if (serverDb) {
     try {
-      const examsDoc = await getDoc(doc(serverDb, "admin_config", "exams"));
+      const examsDoc = await withTimeout(getDoc(doc(serverDb, "admin_config", "exams")), 1200);
       if (examsDoc.exists()) {
         const cloudExams = examsDoc.data();
         if (cloudExams && typeof cloudExams === "object") {
@@ -550,11 +564,11 @@ async function loadPersistedData() {
         }
       }
     } catch (cloudErr) {
-      console.warn("⚠️ [PERSISTENCE] Failed to load EXAMS_DATABASE from Cloud Firestore:", cloudErr);
+      console.warn("⚠️ [PERSISTENCE] Failed to load EXAMS_DATABASE from Cloud Firestore (Enforcing safety fallback):", cloudErr);
     }
 
     try {
-      const questionsDoc = await getDoc(doc(serverDb, "admin_config", "questions"));
+      const questionsDoc = await withTimeout(getDoc(doc(serverDb, "admin_config", "questions")), 1200);
       if (questionsDoc.exists()) {
         const cloudQuestions = questionsDoc.data();
         if (cloudQuestions && typeof cloudQuestions === "object") {
@@ -566,7 +580,7 @@ async function loadPersistedData() {
         }
       }
     } catch (cloudErr) {
-      console.warn("⚠️ [PERSISTENCE] Failed to load QUESTIONS_DATABASE from Cloud Firestore:", cloudErr);
+      console.warn("⚠️ [PERSISTENCE] Failed to load QUESTIONS_DATABASE from Cloud Firestore (Enforcing safety fallback):", cloudErr);
     }
   }
 }
@@ -584,8 +598,8 @@ async function savePersistedData() {
   // 2. Save/Push live arrays to Cloud Firestore for high-availability
   if (serverDb) {
     try {
-      await setDoc(doc(serverDb, "admin_config", "exams"), EXAMS_DATABASE, { merge: true });
-      await setDoc(doc(serverDb, "admin_config", "questions"), QUESTIONS_DATABASE, { merge: true });
+      await withTimeout(setDoc(doc(serverDb, "admin_config", "exams"), EXAMS_DATABASE, { merge: true }), 1500);
+      await withTimeout(setDoc(doc(serverDb, "admin_config", "questions"), QUESTIONS_DATABASE, { merge: true }), 1500);
       console.log("☁️ [PERSISTENCE] Successfully synced EXAMS_DATABASE & QUESTIONS_DATABASE to Cloud Firestore.");
     } catch (cloudErr) {
       console.error("❌ [PERSISTENCE] Error syncing databases to Cloud Firestore:", cloudErr);

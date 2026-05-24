@@ -18,16 +18,55 @@ import {
   getDoc,
   setDoc,
   updateDoc,
-  getDocFromServer
+  getDocFromServer,
+  setLogLevel
 } from "firebase/firestore";
-import firebaseConfig from "../firebase-applet-config.json";
+import firebaseConfigDefault from "../firebase-applet-config.json";
+
+// We check local storage for custom overridden credentials (allows Vercel users to change project dynamically)
+let firebaseConfig: any = { ...firebaseConfigDefault };
+
+const customConfigStr = typeof window !== "undefined" ? window.localStorage.getItem("kalinga_user_firebase_config") : null;
+if (customConfigStr) {
+  try {
+    const customConfig = JSON.parse(customConfigStr);
+    if (customConfig && typeof customConfig === "object" && customConfig.apiKey) {
+      console.log("🔥 Using custom Firebase configuration from Local Storage:", customConfig.projectId);
+      firebaseConfig = { ...firebaseConfig, ...customConfig };
+    }
+  } catch (e) {
+    console.error("Failed to parse custom Firebase config from local storage:", e);
+  }
+} else {
+  // Check Vite client-side environment variables as alternative fallback
+  const metaEnv = (import.meta as any).env || {};
+  const envApiKey = metaEnv.VITE_FIREBASE_API_KEY;
+  if (envApiKey) {
+    console.log("🔥 Using custom Firebase configuration from Environment Variables:", metaEnv.VITE_FIREBASE_PROJECT_ID);
+    firebaseConfig = {
+      apiKey: envApiKey,
+      authDomain: metaEnv.VITE_FIREBASE_AUTH_DOMAIN || `${metaEnv.VITE_FIREBASE_PROJECT_ID}.firebaseapp.com`,
+      projectId: metaEnv.VITE_FIREBASE_PROJECT_ID,
+      storageBucket: metaEnv.VITE_FIREBASE_STORAGE_BUCKET || `${metaEnv.VITE_FIREBASE_PROJECT_ID}.firebasestorage.app`,
+      messagingSenderId: metaEnv.VITE_FIREBASE_MESSAGING_SENDER_ID,
+      appId: metaEnv.VITE_FIREBASE_APP_ID,
+      measurementId: metaEnv.VITE_FIREBASE_MEASUREMENT_ID || "",
+      firestoreDatabaseId: metaEnv.VITE_FIREBASE_DATABASE_ID || metaEnv.VITE_FIREBASE_FIRESTORE_DATABASE_ID || firebaseConfigDefault.firestoreDatabaseId
+    };
+  }
+}
 
 // Initialize the App
 const app = initializeApp(firebaseConfig);
 
 // Initialize Services
-export const db = getFirestore(app);
+export const db = (firebaseConfig.firestoreDatabaseId && firebaseConfig.firestoreDatabaseId !== "(default)")
+  ? getFirestore(app, firebaseConfig.firestoreDatabaseId)
+  : getFirestore(app);
 export const auth = getAuth(app);
+
+// Suppress benign internal gRPC idle stream cancellation messages in the console
+setLogLevel("error");
 
 // Authentication Providers
 export const googleProvider = new GoogleAuthProvider();

@@ -3,9 +3,26 @@ import path from "path";
 import fs from "fs";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI, Type } from "@google/genai";
+import { initializeApp } from "firebase/app";
+import { getFirestore, doc, getDoc, setDoc } from "firebase/firestore";
 
 const app = express();
 const PORT = 3000;
+
+// Initialize Firebase App & db on server-side dynamically for dynamic exam and question persistence
+let firebaseApp;
+let serverDb: any = null;
+try {
+  const configPath = path.join(process.cwd(), "firebase-applet-config.json");
+  if (fs.existsSync(configPath)) {
+    const firebaseConfig = JSON.parse(fs.readFileSync(configPath, "utf-8"));
+    firebaseApp = initializeApp(firebaseConfig);
+    serverDb = getFirestore(firebaseApp);
+    console.log("🟢 [FIREBASE SERVER] Initialized successfully in backend.");
+  }
+} catch (error) {
+  console.error("❌ [FIREBASE SERVER] Failed to initialize:", error);
+}
 
 app.use(express.json());
 
@@ -482,12 +499,13 @@ let QUESTIONS_DATABASE: Record<string, any[]> = {
 };
 
 // =========================================================================
-// DISK PERSISTENCE FOR ADMIN UPLOADS (EXAMS_DATABASE & QUESTIONS_DATABASE)
+// HYBRID FIRESTORE & DISK PERSISTENCE FOR ADMIN UPLOADS (EXAMS_DATABASE & QUESTIONS_DATABASE)
 // =========================================================================
 const EXAMS_FILE = path.join(process.cwd(), "custom_exams_db.json");
 const QUESTIONS_FILE = path.join(process.cwd(), "custom_questions_db.json");
 
-function loadPersistedData() {
+async function loadPersistedData() {
+  // 1. Read files locally from disk as base/initial fallback
   try {
     if (fs.existsSync(EXAMS_FILE)) {
       const data = fs.readFileSync(EXAMS_FILE, "utf-8");
@@ -498,7 +516,7 @@ function loadPersistedData() {
       }
     }
   } catch (err) {
-    console.error("❌ [PERSISTENCE] Error loading EXAMS_DATABASE:", err);
+    console.error("❌ [PERSISTENCE] Error loading EXAMS_DATABASE from disk:", err);
   }
 
   try {
@@ -511,11 +529,50 @@ function loadPersistedData() {
       }
     }
   } catch (err) {
-    console.error("❌ [PERSISTENCE] Error loading QUESTIONS_DATABASE:", err);
+    console.error("❌ [PERSISTENCE] Error loading QUESTIONS_DATABASE from disk:", err);
+  }
+
+  // 2. Fetch live config overrides from Firestore Cloud Database (extremely robust on Vercel!)
+  if (serverDb) {
+    try {
+      const examsDoc = await getDoc(doc(serverDb, "admin_config", "exams"));
+      if (examsDoc.exists()) {
+        const cloudExams = examsDoc.data();
+        if (cloudExams && typeof cloudExams === "object") {
+          // Merge custom data arrays safely into existing
+          EXAMS_DATABASE = {
+            board: [...(cloudExams.board || []), ...EXAMS_DATABASE.board.filter((b: any) => !(cloudExams.board || []).some((cb: any) => cb.id === b.id))],
+            teaching: [...(cloudExams.teaching || []), ...EXAMS_DATABASE.teaching.filter((t: any) => !(cloudExams.teaching || []).some((ct: any) => ct.id === t.id))],
+            competitive: [...(cloudExams.competitive || []), ...EXAMS_DATABASE.competitive.filter((c: any) => !(cloudExams.competitive || []).some((cc: any) => cc.id === c.id))],
+            others: [...(cloudExams.others || []), ...EXAMS_DATABASE.others.filter((o: any) => !(cloudExams.others || []).some((co: any) => co.id === o.id))]
+          };
+          console.log("🟢 [PERSISTENCE] Synced dynamic EXAMS_DATABASE from Cloud Firestore.");
+        }
+      }
+    } catch (cloudErr) {
+      console.warn("⚠️ [PERSISTENCE] Failed to load EXAMS_DATABASE from Cloud Firestore:", cloudErr);
+    }
+
+    try {
+      const questionsDoc = await getDoc(doc(serverDb, "admin_config", "questions"));
+      if (questionsDoc.exists()) {
+        const cloudQuestions = questionsDoc.data();
+        if (cloudQuestions && typeof cloudQuestions === "object") {
+          QUESTIONS_DATABASE = {
+            ...QUESTIONS_DATABASE,
+            ...cloudQuestions
+          };
+          console.log("🟢 [PERSISTENCE] Synced dynamic QUESTIONS_DATABASE from Cloud Firestore.");
+        }
+      }
+    } catch (cloudErr) {
+      console.warn("⚠️ [PERSISTENCE] Failed to load QUESTIONS_DATABASE from Cloud Firestore:", cloudErr);
+    }
   }
 }
 
-function savePersistedData() {
+async function savePersistedData() {
+  // 1. Write to local disk file system
   try {
     fs.writeFileSync(EXAMS_FILE, JSON.stringify(EXAMS_DATABASE, null, 2), "utf-8");
     fs.writeFileSync(QUESTIONS_FILE, JSON.stringify(QUESTIONS_DATABASE, null, 2), "utf-8");
@@ -523,10 +580,40 @@ function savePersistedData() {
   } catch (err) {
     console.error("❌ [PERSISTENCE] Error saving databases to disk:", err);
   }
+
+  // 2. Save/Push live arrays to Cloud Firestore for high-availability
+  if (serverDb) {
+    try {
+      await setDoc(doc(serverDb, "admin_config", "exams"), EXAMS_DATABASE, { merge: true });
+      await setDoc(doc(serverDb, "admin_config", "questions"), QUESTIONS_DATABASE, { merge: true });
+      console.log("☁️ [PERSISTENCE] Successfully synced EXAMS_DATABASE & QUESTIONS_DATABASE to Cloud Firestore.");
+    } catch (cloudErr) {
+      console.error("❌ [PERSISTENCE] Error syncing databases to Cloud Firestore:", cloudErr);
+    }
+  }
 }
 
-// Perform initial load on boot
-loadPersistedData();
+let wasLoaded = false;
+let loadPromise: Promise<void> | null = null;
+
+async function ensureDataLoaded() {
+  if (wasLoaded) return;
+  if (!loadPromise) {
+    loadPromise = loadPersistedData().then(() => {
+      wasLoaded = true;
+    }).catch(err => {
+      console.error("❌ ensureDataLoaded failed to load persisted data:", err);
+      loadPromise = null; // Reset cache so next request retries
+      throw err;
+    });
+  }
+  await loadPromise;
+}
+
+// Perform initial load in background on boot
+ensureDataLoaded().catch(err => {
+  console.error("❌ Background persistence loading failed on boot:", err);
+});
 
 // Daily Current Affairs (Odisha & national)
 const CURRENT_AFFAIRS = [
@@ -639,13 +726,25 @@ let activeBattleSessions: any[] = [];
 // ==========================================
 
 // 1. Get Exams
-app.get("/api/exams-data", (req, res) => {
-  res.json(EXAMS_DATABASE);
+app.get("/api/exams-data", async (req, res) => {
+  try {
+    await ensureDataLoaded();
+    res.json(EXAMS_DATABASE);
+  } catch (err) {
+    console.error("Error loaded exams:", err);
+    res.status(500).json({ error: "Failed to load database." });
+  }
 });
 
 // 2. Get Mock Questions for specific Test with smart theme-relevant dynamic generator
-app.get("/api/test-questions/:testId", (req, res) => {
+app.get("/api/test-questions/:testId", async (req, res) => {
   const { testId } = req.params;
+  
+  try {
+    await ensureDataLoaded();
+  } catch (err) {
+    console.error("Error loading questions fallback:", err);
+  }
   
   if (QUESTIONS_DATABASE[testId]) {
     return res.json(QUESTIONS_DATABASE[testId]);
@@ -1087,6 +1186,12 @@ app.post("/api/ai/analyze-performance", async (req, res) => {
 
 // 11. Custom Admin AI Word Document/Text Sheet MCQ Mock Test Parser
 app.post("/api/admin/parse-test", async (req, res) => {
+  try {
+    await ensureDataLoaded();
+  } catch (err) {
+    console.error("ensureDataLoaded failure in parse-test:", err);
+  }
+
   const {
     rawText,
     examCategory, // board | teaching | competitive | others
@@ -1281,11 +1386,18 @@ ${rawText}
     questionsCount: finalQuantity,
     category: examCategory,
     examId,
+    questions: finalQuestions,
+    exams_database: EXAMS_DATABASE
   });
 });
 
 // 12. Edit uploaded custom mock test
-app.post("/api/admin/edit-test", (req, res) => {
+app.post("/api/admin/edit-test", async (req, res) => {
+  try {
+    await ensureDataLoaded();
+  } catch (err) {
+    console.error("ensureDataLoaded failure in edit-test:", err);
+  }
   const { category, examId, testId, title, durationMins, negativeMarking, marksPerQuestion } = req.body;
   if (!category || !examId || !testId) {
     return res.status(400).json({ error: "Missing required identifier fields." });
@@ -1319,11 +1431,16 @@ app.post("/api/admin/edit-test", (req, res) => {
 
   savePersistedData();
 
-  res.json({ success: true, test });
+  res.json({ success: true, test, exams_database: EXAMS_DATABASE });
 });
 
 // 13. Delete uploaded custom mock test
-app.post("/api/admin/delete-test", (req, res) => {
+app.post("/api/admin/delete-test", async (req, res) => {
+  try {
+    await ensureDataLoaded();
+  } catch (err) {
+    console.error("ensureDataLoaded failure in delete-test:", err);
+  }
   const { category, examId, testId } = req.body;
   if (!category || !examId || !testId) {
     return res.status(400).json({ error: "Missing required identifier fields." });
@@ -1348,7 +1465,7 @@ app.post("/api/admin/delete-test", (req, res) => {
 
   savePersistedData();
 
-  res.json({ success: true, message: "Mock test series completely removed from live database." });
+  res.json({ success: true, message: "Mock test series completely removed from live database.", exams_database: EXAMS_DATABASE });
 });
 
 // Helper regex parser for fallback or simulation

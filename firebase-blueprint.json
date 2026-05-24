@@ -36,6 +36,22 @@
         "xp": {
           "type": "number",
           "description": "Experience points indicating scholarly merit"
+        },
+        "mobile": {
+          "type": "string",
+          "description": "Active Indian mobile contact number"
+        },
+        "badges": {
+          "type": "array",
+          "description": "A list of scholarly merit badges achieved"
+        },
+        "savedNotes": {
+          "type": "array",
+          "description": "Custom bookmark materials and high-yield notes"
+        },
+        "testHistory": {
+          "type": "array",
+          "description": "Detailed answers and grading logs for completed mock exams"
         }
       },
       "required": ["uid", "name", "email", "examTarget", "district", "streak", "coins", "xp"]

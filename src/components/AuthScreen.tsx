@@ -26,9 +26,60 @@ interface AuthScreenProps {
   onExit: () => void;
 }
 
+// Utility to catch domain restrictions and guide user on Firebase Console configuration
+const formatFirebaseError = (err: any, defaultMsg: string): string => {
+  const code = String(err?.code || "").toLowerCase();
+  const message = String(err?.message || (typeof err === "string" ? err : "")).toLowerCase();
+  const rawString = JSON.stringify(err || "").toLowerCase();
+  
+  const isUnauthorized = 
+    code.includes("unauthorized-domain") || 
+    code.includes("unauthorized_domain") ||
+    message.includes("unauthorized-domain") || 
+    message.includes("unauthorized_domain") ||
+    rawString.includes("unauthorized-domain") ||
+    rawString.includes("unauthorized_domain") ||
+    rawString.includes("auth/unauthorized-domain");
+
+  if (isUnauthorized) {
+    const activeDomain = window.location.hostname;
+    return `🔒 Firebase Domain Unauthorized! Authentication is prohibited from non-registered domains. You are currently browsing from: "${activeDomain}". To solve this, you must authorize this domain in your Firebase console.`;
+  }
+  
+  return defaultMsg;
+};
+
+const parseFirebaseSnippet = (text: string) => {
+  try {
+    const trimmed = text.trim();
+    // Try standard JSON parse first
+    const parsed = JSON.parse(trimmed);
+    if (parsed && typeof parsed === "object" && parsed.apiKey) {
+      return parsed;
+    }
+  } catch (e) {}
+
+  // Advanced Regex Parser for copied Javascript/Web configuration snippets directly from Firebase Console
+  const keys = ['apiKey', 'authDomain', 'projectId', 'storageBucket', 'messagingSenderId', 'appId', 'measurementId', 'firestoreDatabaseId'];
+  const extracted: Record<string, string> = {};
+  
+  keys.forEach(key => {
+    const regex = new RegExp(`['"]?${key}['"]?\\s*:\\s*['"]([^'"]+)['"]`);
+    const match = text.match(regex);
+    if (match && match[1]) {
+      extracted[key] = match[1];
+    }
+  });
+
+  if (extracted.apiKey && extracted.projectId) {
+    return extracted;
+  }
+  return null;
+};
+
 export default function AuthScreen({ onLoginSuccess, onExit }: AuthScreenProps) {
-  // Screens: "signin" | "signup" | "forgot" | "phone"
-  const [screen, setScreen] = useState<"signin" | "signup" | "forgot" | "phone">("signin");
+  // Screens: "signin" | "signup" | "forgot" | "phone" | "local"
+  const [screen, setScreen] = useState<"signin" | "signup" | "forgot" | "phone" | "local">("signin");
   
   // Form fields
   const [email, setEmail] = useState("");
@@ -47,6 +98,10 @@ export default function AuthScreen({ onLoginSuccess, onExit }: AuthScreenProps) 
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [infoMessage, setInfoMessage] = useState<string | null>(null);
+  
+  // Custom Firebase override states for Vercel/Custom Domain users
+  const [showCustomConfigInput, setShowCustomConfigInput] = useState(false);
+  const [customConfigText, setCustomConfigText] = useState("");
 
   const districts = ["Khordha", "Ganjam", "Cuttack", "Sambalpur", "Bhadrak", "Baleswar", "Mayurbhanj", "Puri", "Koraput", "Bolangir"];
 
@@ -158,9 +213,9 @@ export default function AuthScreen({ onLoginSuccess, onExit }: AuthScreenProps) 
     } catch (err: any) {
       console.error(err);
       if (err.code === "auth/invalid-credential" || err.code === "auth/user-not-found" || err.code === "auth/wrong-password") {
-        setErrorMessage("Invalid email/password combination. If you do not have an profile, please click 'Create Account' above.");
+        setErrorMessage(formatFirebaseError(err, "Invalid email/password combination. If you do not have an profile, please click 'Create Account' above."));
       } else {
-        setErrorMessage(err.message || "Authentication failed. Try again.");
+        setErrorMessage(formatFirebaseError(err, err.message || "Authentication failed. Try again."));
       }
     } finally {
       setLoading(false);
@@ -189,9 +244,9 @@ export default function AuthScreen({ onLoginSuccess, onExit }: AuthScreenProps) 
     } catch (err: any) {
       console.error(err);
       if (err.code === "auth/email-already-in-use") {
-        setErrorMessage("This email is already registered here. Try switching to Log In instead.");
+        setErrorMessage(formatFirebaseError(err, "This email is already registered here. Try switching to Log In instead."));
       } else {
-        setErrorMessage(err.message || "Failed to create credential. Please ensure password has 6+ characters.");
+        setErrorMessage(formatFirebaseError(err, err.message || "Failed to create credential. Please ensure password has 6+ characters."));
       }
     } finally {
       setLoading(false);
@@ -215,7 +270,7 @@ export default function AuthScreen({ onLoginSuccess, onExit }: AuthScreenProps) 
       setInfoMessage("Reset password link dispatched to email. Please check your inbox!");
     } catch (err: any) {
       console.error(err);
-      setErrorMessage(err.message || "Email address lookup failed.");
+      setErrorMessage(formatFirebaseError(err, err.message || "Email address lookup failed."));
     } finally {
       setLoading(false);
     }
@@ -237,9 +292,9 @@ export default function AuthScreen({ onLoginSuccess, onExit }: AuthScreenProps) 
     } catch (err: any) {
       console.error(err);
       if (err.code === "auth/operation-not-allowed") {
-        setErrorMessage("Google Login is not yet activated on your Firebase Console. Please activate Google Auth in Firebase console > Build > Authentication > Sign-in method.");
+        setErrorMessage(formatFirebaseError(err, "Google Login is not yet activated on your Firebase Console. Please activate Google Auth in Firebase console > Build > Authentication > Sign-in method."));
       } else {
-        setErrorMessage(err.message || "Google Single Sign-On failed. Use email registration as backup.");
+        setErrorMessage(formatFirebaseError(err, err.message || "Google Single Sign-On failed. Use email registration as backup."));
       }
     } finally {
       setLoading(false);
@@ -262,9 +317,9 @@ export default function AuthScreen({ onLoginSuccess, onExit }: AuthScreenProps) 
     } catch (err: any) {
       console.error(err);
       if (err.code === "auth/operation-not-allowed") {
-        setErrorMessage("Facebook Provider is not yet configured in your Firebase Console. Set it up inside the Firebase Auth settings page.");
+        setErrorMessage(formatFirebaseError(err, "Facebook Provider is not yet configured in your Firebase Console. Set it up inside the Firebase Auth settings page."));
       } else {
-        setErrorMessage(err.message || "Facebook Authentication bypassed. Check FB application settings.");
+        setErrorMessage(formatFirebaseError(err, err.message || "Facebook Authentication bypassed. Check FB application settings."));
       }
     } finally {
       setLoading(false);
@@ -303,9 +358,9 @@ export default function AuthScreen({ onLoginSuccess, onExit }: AuthScreenProps) 
     } catch (err: any) {
       console.error(err);
       if (err.code === "auth/operation-not-allowed") {
-        setErrorMessage("Phone Auth is not yet enabled in Firebase Console. Go to: Authentication > Sign-in Method to activate.");
+        setErrorMessage(formatFirebaseError(err, "Phone Auth is not yet enabled in Firebase Console. Go to: Authentication > Sign-in Method to activate."));
       } else {
-        setErrorMessage(err.message || "SMS Delivery failed. Ensure your cells are configured or use the quick demo profile.");
+        setErrorMessage(formatFirebaseError(err, err.message || "SMS Delivery failed. Ensure your cells are configured or use the quick demo profile."));
       }
     } finally {
       setLoading(false);
@@ -342,7 +397,7 @@ export default function AuthScreen({ onLoginSuccess, onExit }: AuthScreenProps) 
       }
     } catch (err: any) {
       console.error(err);
-      setErrorMessage("Verification code incorrect or expired. Try code '123456' to bypass.");
+      setErrorMessage(formatFirebaseError(err, "Verification code incorrect or expired. Try code '123456' to bypass."));
     } finally {
       setLoading(false);
     }
@@ -351,6 +406,30 @@ export default function AuthScreen({ onLoginSuccess, onExit }: AuthScreenProps) 
   // High-Speed Direct Profile Quick login fallback for reviewer
   const triggerQuickDemo = (demoName: string, target: string, dist: string) => {
     onLoginSuccess(demoName, target, dist, "9937000123");
+  };
+
+  // Custom Local Offline Profile onboarding (Works perfectly under any custom domain)
+  const handleLocalSignIn = (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMessage(null);
+    setInfoMessage(null);
+
+    const trimmedName = name.trim();
+    if (!trimmedName || trimmedName.length < 2) {
+      setErrorMessage("Please enter a valid Name for your offline registry profile (minimum 2 characters).");
+      return;
+    }
+
+    setLoading(true);
+    setTimeout(() => {
+      onLoginSuccess(
+        trimmedName,
+        examTarget || "bse-10",
+        district || "Khordha",
+        phoneNum || "9937000123"
+      );
+      setLoading(false);
+    }, 350);
   };
 
   return (
@@ -401,15 +480,15 @@ export default function AuthScreen({ onLoginSuccess, onExit }: AuthScreenProps) 
         </div>
 
         {/* Switch Login vs Sign Up vs Phone tabs */}
-        <div className="bg-slate-100 p-1 rounded-xl flex gap-1 mb-6 text-[11px] font-bold">
+        <div className="bg-slate-100 p-1 rounded-xl flex gap-1 mb-6 text-[10.5px] font-bold overflow-x-auto">
           <button
             onClick={() => {
               setScreen("signin");
               setErrorMessage(null);
               setInfoMessage(null);
             }}
-            className={`flex-1 py-2 rounded-lg transition-all ${
-              screen === "signin" ? "bg-white text-blue-950 shadow-sm" : "text-slate-500 hover:text-slate-800"
+            className={`flex-1 min-w-[65px] py-1.5 rounded-lg transition-all ${
+              screen === "signin" ? "bg-white text-blue-950 shadow-sm font-extrabold" : "text-slate-500 hover:text-slate-850"
             }`}
           >
             Log In
@@ -420,8 +499,8 @@ export default function AuthScreen({ onLoginSuccess, onExit }: AuthScreenProps) 
               setErrorMessage(null);
               setInfoMessage(null);
             }}
-            className={`flex-1 py-2 rounded-lg transition-all ${
-              screen === "signup" ? "bg-white text-blue-950 shadow-sm" : "text-slate-500 hover:text-slate-800"
+            className={`flex-1 min-w-[70px] py-1.5 rounded-lg transition-all ${
+              screen === "signup" ? "bg-white text-blue-950 shadow-sm font-extrabold" : "text-slate-500 hover:text-slate-850"
             }`}
           >
             Sign Up
@@ -433,18 +512,184 @@ export default function AuthScreen({ onLoginSuccess, onExit }: AuthScreenProps) 
               setInfoMessage(null);
               setOtpSent(false);
             }}
-            className={`flex-1 py-2 rounded-lg transition-all ${
-              screen === "phone" ? "bg-white text-blue-950 shadow-sm" : "text-slate-500 hover:text-slate-800"
+            className={`flex-1 min-w-[70px] py-1.5 rounded-lg transition-all ${
+              screen === "phone" ? "bg-white text-blue-950 shadow-sm font-extrabold" : "text-slate-500 hover:text-slate-850"
             }`}
           >
             SMS OTP
+          </button>
+          <button
+            onClick={() => {
+              setScreen("local");
+              setErrorMessage(null);
+              setInfoMessage(null);
+            }}
+            className={`flex-1 min-w-[95px] py-1.5 rounded-lg transition-all ${
+              screen === "local" ? "bg-amber-500 text-white shadow-sm font-extrabold" : "text-amber-700 hover:bg-amber-100"
+            }`}
+          >
+            🌟 Local Login
           </button>
         </div>
 
         {/* Errors / Info Messaging block */}
         {errorMessage && (
-          <div className="px-4 py-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl mb-6 font-medium">
-            {errorMessage}
+          <div className="px-4 py-4 bg-red-50 border border-red-200 text-red-700 text-xs rounded-2xl mb-6 font-medium space-y-3">
+            <div className="flex items-start gap-2">
+              <span className="text-sm font-extrabold text-red-600">⚠️</span>
+              <div className="leading-relaxed">{errorMessage}</div>
+            </div>
+            
+            {(errorMessage.includes("Firebase Domain Unauthorized") || 
+              errorMessage.toLowerCase().includes("unauthorized-domain") || 
+              errorMessage.toLowerCase().includes("auth/unauthorized-domain") ||
+              errorMessage.toLowerCase().includes("unauthorized_domain")) && (
+              <div className="pt-3 border-t border-red-200/60 space-y-3">
+                <div className="bg-white/80 backdrop-blur-xs p-3.5 rounded-xl border border-red-150 text-slate-850 space-y-3">
+                  <div className="font-extrabold text-xs text-blue-955 flex items-center gap-1.5 uppercase tracking-wider">
+                    <span className="h-2 w-2 rounded-full bg-orange-500 animate-ping"></span>
+                    📋 Option A: Authorize This Domain Step-by-Step
+                  </div>
+                  
+                  <p className="text-[11px] text-slate-500 leading-normal">
+                    Firebase prohibits user authentication from unregistered websites for security purposes. Since your web app is hosted on a custom URL, you must add it to the <strong>Authorized Domains</strong> list inside your Firebase Console:
+                  </p>
+
+                  <div className="bg-slate-100/80 p-3 rounded-xl border border-slate-250 font-mono text-[10.5px] text-slate-700 space-y-2.5">
+                    <div className="font-bold text-slate-600 text-[10px] uppercase">Domains to copy & authorize:</div>
+                    
+                    <div className="flex items-center justify-between gap-2.5 bg-white p-2 rounded-lg border border-slate-200/70">
+                      <span className="truncate select-all font-bold text-slate-800">{window.location.hostname}</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(window.location.hostname);
+                          alert("✓ Copied: " + window.location.hostname);
+                        }}
+                        className="px-2.5 py-1 bg-orange-500 hover:bg-orange-600 text-white rounded-md font-extrabold text-[10px] transition-all cursor-pointer whitespace-nowrap active:scale-95"
+                      >
+                        Copy
+                      </button>
+                    </div>
+
+                    <p className="text-[10px] text-slate-450 leading-relaxed font-sans">
+                      💡 Tip: Also make sure to authorize your main <code>*.vercel.app</code> production domain inside your project if you deployed there!
+                    </p>
+                  </div>
+
+                  <div className="space-y-2 text-[11px] text-slate-600">
+                    <div className="flex gap-2">
+                      <span className="bg-blue-100 text-blue-900 border border-blue-250 font-black h-4.5 w-4.5 rounded-full flex items-center justify-center shrink-0 text-[10px]">1</span>
+                      <span>Open the <a href="https://console.firebase.google.com/" target="_blank" rel="noopener noreferrer" className="text-orange-600 font-extrabold hover:underline">Firebase Console</a> for your project <strong>{(auth as any)?.app?.options?.projectId || "odisha-new-exam"}</strong>.</span>
+                    </div>
+                    <div className="flex gap-2">
+                      <span className="bg-blue-100 text-blue-900 border border-blue-250 font-black h-4.5 w-4.5 rounded-full flex items-center justify-center shrink-0 text-[10px]">2</span>
+                      <span>Go to <strong>Build</strong> (left sidebar) &rarr; click on <strong>Authentication</strong>.</span>
+                    </div>
+                    <div className="flex gap-2">
+                      <span className="bg-blue-100 text-blue-900 border border-blue-250 font-black h-4.5 w-4.5 rounded-full flex items-center justify-center shrink-0 text-[10px]">3</span>
+                      <span>Click on the <strong>Settings</strong> tab (located next to standard menu tabs "Users / Sign-in method").</span>
+                    </div>
+                    <div className="flex gap-2">
+                      <span className="bg-blue-100 text-blue-900 border border-blue-250 font-black h-4.5 w-4.5 rounded-full flex items-center justify-center shrink-0 text-[10px]">4</span>
+                      <span>Click on the <strong>Authorized domains</strong> menu option.</span>
+                    </div>
+                    <div className="flex gap-2">
+                      <span className="bg-blue-100 text-blue-900 border border-blue-250 font-black h-4.5 w-4.5 rounded-full flex items-center justify-center shrink-0 text-[10px]">5</span>
+                      <span>Click the <strong>Add domain</strong> button, paste the copied domain from above, and click <strong>Add</strong>!</span>
+                    </div>
+                  </div>
+
+                  <div className="pt-2 text-center">
+                    <button
+                      type="button"
+                      onClick={() => window.location.reload()}
+                      className="inline-flex items-center gap-1 px-4 py-2 bg-blue-950 hover:bg-slate-900 text-white rounded-xl font-extrabold text-[11px] cursor-pointer transition-all shadow-md active:scale-95"
+                    >
+                      🔄 Reload Page After Adding Domain
+                    </button>
+                  </div>
+                </div>
+
+                <div className="text-center font-bold text-slate-400 text-[10px] my-1 uppercase">— OR USE FALLBACK MODES —</div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setScreen("local");
+                    setErrorMessage(null);
+                  }}
+                  className="w-full px-3 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl font-bold text-xs transition-all cursor-pointer shadow-sm text-center block"
+                >
+                  🌟 Switch to Secure Local/Offline Profile Mode (Works Anywhere)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => triggerQuickDemo("Subhashree Patnaik (Local)", "bse-10", "Khordha")}
+                  className="w-full px-3 py-2 bg-zinc-850 hover:bg-black text-white rounded-xl font-bold text-xs transition-all cursor-pointer shadow-sm text-center block"
+                >
+                  🚀 Quick Guest Access: Try Demo Student Account
+                </button>
+
+                <div className="pt-1.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowCustomConfigInput(!showCustomConfigInput);
+                      const currentOverride = localStorage.getItem("kalinga_user_firebase_config") || "";
+                      setCustomConfigText(currentOverride);
+                    }}
+                    className="w-full px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-xs transition-all cursor-pointer shadow-sm text-center block"
+                  >
+                    🔧 Change / Reuse Different Firebase Console Config
+                  </button>
+                </div>
+
+                {showCustomConfigInput && (
+                  <div className="mt-3 p-3 bg-white rounded-lg border border-slate-200 shadow-inner text-left space-y-2">
+                    <div className="font-bold text-slate-800 text-xs">🔧 Link Your Custom Firebase Project Configurations</div>
+                    <p className="text-[10px] text-slate-500 leading-normal">
+                      Since standard system-provisioned projects restrict access on personal domains (like Vercel), paste your <strong>Web App Config text</strong> from your custom <code>{(auth as any)?.app?.options?.projectId || "odisha-new-exam"}</code> Firebase Console here, and this site will dynamically connect to your custom database:
+                    </p>
+                    <textarea
+                      placeholder={`Paste standard config object or JSON, e.g:\nconst firebaseConfig = {\n  apiKey: "AIzaSy...",\n  authDomain: "...",\n  projectId: "..."\n};`}
+                      value={customConfigText}
+                      onChange={(e) => setCustomConfigText(e.target.value)}
+                      className="w-full h-28 p-2 font-mono text-[10px] bg-slate-50 border border-slate-300 rounded outline-none focus:ring-1 focus:ring-blue-500 text-slate-700"
+                    />
+                    <div className="flex gap-1.5 justify-end">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          localStorage.removeItem("kalinga_user_firebase_config");
+                          alert("Firebase custom override reset successfully. Reloading...");
+                          window.location.reload();
+                        }}
+                        className="px-2 py-1 bg-slate-150 hover:bg-slate-200 text-slate-700 rounded text-[9.5px] font-bold"
+                      >
+                        Reset Defaults
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const config = parseFirebaseSnippet(customConfigText);
+                          if (config) {
+                            localStorage.setItem("kalinga_user_firebase_config", JSON.stringify(config));
+                            alert("Success: Saved Custom Firebase Configuration! Reloading now...");
+                            window.location.reload();
+                          } else {
+                            alert("Failed: Could not detect your Web App apiKey/projectId. Please copy the full config script directly from the Firebase console!");
+                          }
+                        }}
+                        className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-[9.5px] font-bold"
+                      >
+                        Apply Config & Refresh
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
         {infoMessage && (
@@ -750,6 +995,92 @@ export default function AuthScreen({ onLoginSuccess, onExit }: AuthScreenProps) 
               </form>
             )}
           </div>
+        )}
+
+        {screen === "local" && (
+          <form onSubmit={handleLocalSignIn} className="space-y-4 bg-amber-50/40 p-4 rounded-2xl border border-amber-200/50">
+            <div className="text-amber-950 text-xs font-semibold mb-2 flex items-center gap-1.5">
+              <Sparkles className="h-4 w-4 text-amber-600 fill-amber-400" />
+              <span>Register Custom Offline Account</span>
+            </div>
+            
+            <div>
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Your Full Name</label>
+              <div className="relative">
+                <User className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Akhadu Sambalpuri"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  className="pl-10 pr-4 py-2.5 w-full text-xs border border-slate-250 bg-white rounded-xl outline-none focus:ring-2 focus:ring-amber-500/20 transition-all font-bold"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Target Exam</label>
+                <select
+                  value={examTarget}
+                  onChange={(e) => setExamTarget(e.target.value)}
+                  className="w-full text-xs p-2.5 bg-white border border-slate-250 rounded-xl font-bold text-slate-705 outline-none"
+                >
+                  <option value="opsc-ocs">OPSC Civil Services</option>
+                  <option value="bse-10">BSE Class 10 Board</option>
+                  <option value="osssc-ri">OSSSC Revenue Inspector</option>
+                  <option value="otet">Odisha Teacher (OTET)</option>
+                </select>
+              </div>
+              
+              <div>
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">District</label>
+                <select
+                  value={district}
+                  onChange={(e) => setDistrict(e.target.value)}
+                  className="w-full text-xs p-2.5 bg-white border border-slate-250 rounded-xl text-slate-705 outline-none"
+                >
+                  {districts.map((d) => (
+                    <option key={d} value={d}>{d}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                Cell Phone Number (Optional)
+              </label>
+              <div className="relative">
+                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400 font-mono">+91</span>
+                <input
+                  type="tel"
+                  placeholder="94370 12345"
+                  value={phoneNum}
+                  onChange={(e) => setPhoneNum(e.target.value)}
+                  className="pl-12 pr-4 py-2.5 w-full text-xs border border-slate-250 bg-white rounded-xl outline-none font-mono"
+                />
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full py-3 bg-amber-600 hover:bg-amber-700 text-white font-extrabold text-xs rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-sm"
+            >
+              {loading ? (
+                <RefreshCw className="h-4 w-4 animate-spin" />
+              ) : (
+                <Sparkles className="h-4 w-4 fill-white text-white" />
+              )}
+              Create & Launch Local Profile
+            </button>
+            
+            <p className="text-[10px] text-amber-800 leading-normal text-center mt-2 font-medium">
+              🔒 100% Offline Mode: All scorecards, practice sheets, coins, stats, and history persist securely in your browser cache.
+            </p>
+          </form>
         )}
 
         {/* Social SSO login dividers */}

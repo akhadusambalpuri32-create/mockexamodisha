@@ -26,6 +26,51 @@ import {
   GraduationCap, BookOpen, Trophy, Sparkles, Download, PlayCircle, ShieldAlert, BadgeInfo, LogOut, LayoutDashboard, Heart, Settings, Flame, Bell, MapPin, User, ChevronRight, Menu, X, ToggleLeft
 } from "lucide-react";
 
+const mergeWithLocalExams = (serverExams: any) => {
+  const localExamsStr = localStorage.getItem("kalinga_custom_exams_db");
+  if (!localExamsStr) return serverExams;
+
+  try {
+    const localExams = JSON.parse(localExamsStr);
+    if (!localExams || typeof localExams !== "object") return serverExams;
+
+    const merged = { ...serverExams };
+    const categories = ["board", "teaching", "competitive", "others"];
+
+    categories.forEach((cat) => {
+      if (!merged[cat]) merged[cat] = [];
+      const localCatList = localExams[cat] || [];
+
+      localCatList.forEach((localExam: any) => {
+        const foundIdx = merged[cat].findIndex((e: any) => e.id === localExam.id);
+        if (foundIdx === -1) {
+          merged[cat].push(localExam);
+        } else {
+          const serverExam = merged[cat][foundIdx];
+          const mergedTests = [...(serverExam.tests || [])];
+          
+          (localExam.tests || []).forEach((localTest: any) => {
+            if (!mergedTests.some((t: any) => t.id === localTest.id)) {
+              mergedTests.push(localTest);
+            }
+          });
+          
+          merged[cat][foundIdx] = {
+            ...serverExam,
+            ...localExam,
+            tests: mergedTests
+          };
+        }
+      });
+    });
+
+    return merged;
+  } catch (e) {
+    console.error("Failed to parse local exams database backup:", e);
+    return serverExams;
+  }
+};
+
 export default function App() {
   // Navigation State
   // "landing" | "auth" | "dashboard"
@@ -226,11 +271,12 @@ export default function App() {
       // Save Guest progress
       localStorage.setItem("kalinga_user_guest", JSON.stringify(userProfile));
     } else {
-      // Save authenticated user snapshot to local storage
+      // Save authenticated/local user snapshot to local storage
       const uid = auth.currentUser?.uid;
-      if (uid) {
-        localStorage.setItem(`kalinga_user_${uid}`, JSON.stringify(userProfile));
+      const keySuffix = uid || `local_${userProfile.email.replace(/[@.]/g, "_")}`;
+      localStorage.setItem(`kalinga_user_${keySuffix}`, JSON.stringify(userProfile));
 
+      if (uid) {
         // Sync to cloud Firestore database in background
         const userDocRef = doc(db, "users", uid);
         setDoc(userDocRef, {
@@ -300,14 +346,32 @@ export default function App() {
   // Load database models from Express API
   useEffect(() => {
     const fetchExams = async () => {
+      let loadedData: any = null;
       try {
         const response = await fetch("/api/exams-data");
-        const data = await response.json();
-        setExamsData(data);
+        if (response.ok) {
+          loadedData = await response.json();
+        }
       } catch (err) {
         console.error("Failed to load schema from Express backend. Building offline fallback.", err);
-        // Fallback robust mocks if server isn't active/reachable yet
-        setExamsData({
+      }
+
+      if (loadedData) {
+        const merged = mergeWithLocalExams(loadedData);
+        setExamsData(merged);
+        localStorage.setItem("kalinga_custom_exams_db", JSON.stringify(merged));
+      } else {
+        // Build dynamic fallback using cached client-side db or the custom mocks
+        const cachedExams = localStorage.getItem("kalinga_custom_exams_db");
+        if (cachedExams) {
+          try {
+            setExamsData(JSON.parse(cachedExams));
+            return;
+          } catch (e) {}
+        }
+
+        // If even local storage is empty, fallback to basic mock exams
+        const baseMocks = {
           board: [
             {
               id: "bse-10",
@@ -368,7 +432,10 @@ export default function App() {
               ]
             }
           ]
-        });
+        };
+        const mergedBase = mergeWithLocalExams(baseMocks);
+        setExamsData(mergedBase);
+        localStorage.setItem("kalinga_custom_exams_db", JSON.stringify(mergedBase));
       }
     };
     fetchExams();
@@ -386,7 +453,12 @@ export default function App() {
   const handleLoginSuccess = (name: string, examTarget: string, district: string, mobile: string) => {
     // Read cached profile or guest history if applicable
     const isGuestUser = name.includes("Guest") || name === "Guest Aspirant" || name === "Guest Scholar";
-    const cacheKey = isGuestUser ? "kalinga_user_guest" : `kalinga_user_${auth.currentUser?.uid || "current"}`;
+    const userEmail = `${name.toLowerCase().replace(/\s/g, "")}@odishaedu.in`;
+    const uid = auth.currentUser?.uid;
+    const cacheKey = isGuestUser 
+      ? "kalinga_user_guest" 
+      : `kalinga_user_${uid || "local_" + userEmail.replace(/[@.]/g, "_")}`;
+    
     const cached = localStorage.getItem(cacheKey);
     let cachedData: any = null;
     if (cached) {
@@ -432,9 +504,38 @@ export default function App() {
   };
 
   const handleStartTest = async (testId: string) => {
+    if (!userProfile || userProfile.isGuest) {
+      setAppState("auth");
+      alert("🔐 Sign In or Sign Up Required!\n\nPlease sign in or create a student account before sitting for any mock exams, in order to store your custom progress, exam answers, and historic exam scorecard data safely.");
+      return;
+    }
+
     try {
-      const response = await fetch(`/api/test-questions/${testId}`);
-      const questionsData = await response.json();
+      let questionsData: any = null;
+      try {
+        const response = await fetch(`/api/test-questions/${testId}`);
+        if (response.ok) {
+          questionsData = await response.json();
+        }
+      } catch (fErr) {
+        console.warn("Backend mock questions fetching failed, accessing browser offline copy...", fErr);
+      }
+
+      if (!Array.isArray(questionsData) || questionsData.length === 0) {
+        const cachedQ = localStorage.getItem(`kalinga_custom_questions_${testId}`);
+        if (cachedQ) {
+          try {
+            questionsData = JSON.parse(cachedQ);
+            console.log(`🟢 Loaded test questions for "${testId}" successfully from browser local mirror cache.`);
+          } catch (pErr) {
+            console.error("Failed to parse local stored questions:", pErr);
+          }
+        }
+      }
+
+      if (!questionsData) {
+        throw new Error("No exam sheet questions available in either local store or server memory.");
+      }
 
       // Find the exam duration and marking stats from list
       let matchedExam = examsData.board?.find((e) => e.tests.some((t) => t.id === testId))
@@ -1033,9 +1134,17 @@ export default function App() {
                 <AdminPanel 
                   exams={examsData}
                   onReloadExams={async () => {
-                    const response = await fetch("/api/exams-data");
-                    const data = await response.json();
-                    setExamsData(data);
+                    try {
+                      const response = await fetch("/api/exams-data");
+                      if (response.ok) {
+                        const data = await response.json();
+                        const merged = mergeWithLocalExams(data);
+                        setExamsData(merged);
+                        localStorage.setItem("kalinga_custom_exams_db", JSON.stringify(merged));
+                      }
+                    } catch (e) {
+                      console.error("Failed to reload dynamic exams database:", e);
+                    }
                   }}
                 />
               )}

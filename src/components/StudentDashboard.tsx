@@ -576,6 +576,76 @@ export default function StudentDashboard({
                 </div>
               </div>
             </div>
+
+            {/* Historic Exam Attempts & Dashboard Stats */}
+            <div className="bg-white border border-slate-200 rounded-3xl p-6 space-y-4 font-medium shadow-xs">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+                <div className="text-left">
+                  <h4 className="font-extrabold text-blue-950 text-sm flex items-center gap-1.5 leading-none">
+                    <Trophy className="h-4.5 w-4.5 text-amber-500 fill-amber-500/20" /> My Exam History & Attempt Logs
+                  </h4>
+                  <span className="text-[10px] text-slate-400 font-bold block mt-1">
+                    Analyze your CBT exam attempts and metrics to improve state ranking
+                  </span>
+                </div>
+                
+                <span className="text-[10px] font-mono text-slate-500 bg-slate-100 px-3 py-1 rounded-xl font-bold">
+                  Total Tests Taken: {userProfile?.testHistory?.length || 0}
+                </span>
+              </div>
+
+              {!userProfile?.testHistory || userProfile.testHistory.length === 0 ? (
+                <div className="py-8 text-center text-slate-400 space-y-2">
+                  <p className="text-xs font-bold text-slate-700">No exam attempts found</p>
+                  <p className="text-[10px] text-slate-400 leading-relaxed max-w-sm mx-auto">
+                    Select an exam track from above and launch mock papers. Your detailed scorecard, accuracy, and performance will compile and display here!
+                  </p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead>
+                      <tr className="border-b border-slate-100 text-[10px] uppercase text-slate-450 font-black font-mono py-2">
+                        <th className="py-2.5 px-3">Exam Paper / Title</th>
+                        <th className="py-2.5 px-3">Date</th>
+                        <th className="py-2.5 px-3 text-center">Score</th>
+                        <th className="py-2.5 px-3 text-center">Accuracy</th>
+                        <th className="py-2.5 px-3 text-center">Time Spent</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-50">
+                      {userProfile.testHistory.map((attempt) => (
+                        <tr key={attempt.id} className="hover:bg-slate-50/50 transition-colors">
+                          <td className="py-3 px-3 font-extrabold text-slate-900 leading-snug">
+                            {attempt.testTitle}
+                          </td>
+                          <td className="py-3 px-3 font-bold text-slate-500 font-mono text-[10.5px]">
+                            {attempt.attemptedAt}
+                          </td>
+                          <td className="py-3 px-3 text-center font-mono">
+                            <span className="font-extrabold text-orange-600 bg-orange-50 border border-orange-100 px-2 py-0.5 rounded-lg text-[11px]">
+                              {typeof attempt.marks === 'number' ? attempt.marks.toFixed(2) : attempt.marks}/{attempt.totalMarks}
+                            </span>
+                          </td>
+                          <td className="py-3 px-3 text-center font-bold">
+                            <span className={`px-2 py-0.5 rounded-md text-[10px] font-black ${
+                              attempt.accuracy >= 80 ? "bg-emerald-50 text-emerald-700 border border-emerald-100" :
+                              attempt.accuracy >= 50 ? "bg-amber-50 text-amber-700 border border-amber-100" :
+                              "bg-red-50 text-red-700 border border-red-100"
+                            }`}>
+                              {attempt.accuracy}%
+                            </span>
+                          </td>
+                          <td className="py-3 px-3 text-center font-semibold text-slate-500 font-mono text-[10.5px]">
+                            {Math.floor(attempt.timeSpent / 60)}m {attempt.timeSpent % 60}s
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
           </motion.div>
         )}
 

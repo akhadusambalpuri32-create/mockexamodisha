@@ -105,6 +105,10 @@ export default function AdminPanel({ exams, onReloadExams }: AdminPanelProps) {
         })
       });
       if (resp.ok) {
+        const body = await resp.json();
+        if (body.exams_database) {
+          localStorage.setItem("kalinga_custom_exams_db", JSON.stringify(body.exams_database));
+        }
         setLogs(prev => [`[Admin Edit] Updated parameters for "${editTitle}".`, ...prev]);
         setEditingTestId(null);
         await onReloadExams();
@@ -135,6 +139,11 @@ export default function AdminPanel({ exams, onReloadExams }: AdminPanelProps) {
         })
       });
       if (resp.ok) {
+        const body = await resp.json();
+        if (body.exams_database) {
+          localStorage.setItem("kalinga_custom_exams_db", JSON.stringify(body.exams_database));
+        }
+        localStorage.removeItem(`kalinga_custom_questions_${test.id}`);
         setLogs(prev => [`[Admin Delete] Deleted custom test "${test.title}".`, ...prev]);
         await onReloadExams();
       } else {
@@ -288,6 +297,12 @@ export default function AdminPanel({ exams, onReloadExams }: AdminPanelProps) {
       }
 
       setParseStatus("Committing database sync...");
+      if (result.exams_database) {
+        localStorage.setItem("kalinga_custom_exams_db", JSON.stringify(result.exams_database));
+      }
+      if (result.questions && result.testId) {
+        localStorage.setItem(`kalinga_custom_questions_${result.testId}`, JSON.stringify(result.questions));
+      }
       await onReloadExams();
 
       setParseSuccessData({

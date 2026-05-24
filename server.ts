@@ -500,6 +500,63 @@ let QUESTIONS_DATABASE: Record<string, any[]> = {
   ]
 };
 
+// Copy of default static exams representation for surgical merged recovery
+const ORIGINAL_STATIC_EXAMS = JSON.parse(JSON.stringify(EXAMS_DATABASE));
+
+function repairAndMergeExams(loadedExams: any): any {
+  if (!loadedExams || typeof loadedExams !== "object") {
+    return JSON.parse(JSON.stringify(ORIGINAL_STATIC_EXAMS));
+  }
+
+  const result: any = {
+    board: [],
+    teaching: [],
+    competitive: [],
+    others: []
+  };
+
+  const categories = ["board", "teaching", "competitive", "others"] as const;
+
+  categories.forEach(cat => {
+    const originalList = ORIGINAL_STATIC_EXAMS[cat] || [];
+    const loadedList = loadedExams[cat] || [];
+
+    // 1. Maintain and repair each predefined original exam structure
+    originalList.forEach((origExam: any) => {
+      const loadedExam = loadedList.find((le: any) => le.id === origExam.id);
+      const repairedExam = JSON.parse(JSON.stringify(origExam));
+
+      if (loadedExam) {
+        // Collect extra custom parsed tests that are not predefined
+        const extraTests = (loadedExam.tests || []).filter((test: any) => {
+          const isPredefined = (origExam.tests || []).some((ot: any) => ot.id === test.id);
+          return !isPredefined;
+        });
+
+        if (!repairedExam.tests) repairedExam.tests = [];
+        repairedExam.tests = [...repairedExam.tests, ...extraTests];
+
+        if (typeof loadedExam.totalQuestions === "number") repairedExam.totalQuestions = loadedExam.totalQuestions;
+        if (typeof loadedExam.durationMins === "number") repairedExam.durationMins = loadedExam.durationMins;
+        if (typeof loadedExam.negativeMarking === "number") repairedExam.negativeMarking = loadedExam.negativeMarking;
+        if (typeof loadedExam.marksPerQuestion === "number") repairedExam.marksPerQuestion = loadedExam.marksPerQuestion;
+      }
+
+      result[cat].push(repairedExam);
+    });
+
+    // 2. Protect and retain any fully custom series created by the user
+    loadedList.forEach((loadedExam: any) => {
+      const isPredefined = originalList.some((oe: any) => oe.id === loadedExam.id);
+      if (!isPredefined) {
+        result[cat].push(JSON.parse(JSON.stringify(loadedExam)));
+      }
+    });
+  });
+
+  return result;
+}
+
 // =========================================================================
 // HYBRID FIRESTORE & DISK PERSISTENCE FOR ADMIN UPLOADS (EXAMS_DATABASE & QUESTIONS_DATABASE)
 // =========================================================================
@@ -527,12 +584,17 @@ async function loadPersistedData() {
       const data = fs.readFileSync(EXAMS_FILE, "utf-8");
       const parsed = JSON.parse(data);
       if (parsed && typeof parsed === "object") {
-        EXAMS_DATABASE = parsed;
-        console.log("🟢 [PERSISTENCE] Loaded custom EXAMS_DATABASE from disk.");
+        EXAMS_DATABASE = repairAndMergeExams(parsed);
+        console.log("🟢 [PERSISTENCE] Loaded and repaired EXAMS_DATABASE from disk.");
+      } else {
+        EXAMS_DATABASE = JSON.parse(JSON.stringify(ORIGINAL_STATIC_EXAMS));
       }
+    } else {
+      EXAMS_DATABASE = JSON.parse(JSON.stringify(ORIGINAL_STATIC_EXAMS));
     }
   } catch (err) {
     console.error("❌ [PERSISTENCE] Error loading EXAMS_DATABASE from disk:", err);
+    EXAMS_DATABASE = JSON.parse(JSON.stringify(ORIGINAL_STATIC_EXAMS));
   }
 
   try {
@@ -555,14 +617,11 @@ async function loadPersistedData() {
       if (examsDoc.exists()) {
         const cloudExams = examsDoc.data();
         if (cloudExams && typeof cloudExams === "object") {
-          // Merge custom data arrays safely into existing
-          EXAMS_DATABASE = {
-            board: [...(cloudExams.board || []), ...EXAMS_DATABASE.board.filter((b: any) => !(cloudExams.board || []).some((cb: any) => cb.id === b.id))],
-            teaching: [...(cloudExams.teaching || []), ...EXAMS_DATABASE.teaching.filter((t: any) => !(cloudExams.teaching || []).some((ct: any) => ct.id === t.id))],
-            competitive: [...(cloudExams.competitive || []), ...EXAMS_DATABASE.competitive.filter((c: any) => !(cloudExams.competitive || []).some((cc: any) => cc.id === c.id))],
-            others: [...(cloudExams.others || []), ...EXAMS_DATABASE.others.filter((o: any) => !(cloudExams.others || []).some((co: any) => co.id === o.id))]
-          };
-          console.log("🟢 [PERSISTENCE] Synced dynamic EXAMS_DATABASE from Cloud Firestore.");
+          // Merge custom data arrays safely and repair against original predefined definitions
+          EXAMS_DATABASE = repairAndMergeExams(cloudExams);
+          console.log("🟢 [PERSISTENCE] Synced & surgically repaired EXAMS_DATABASE from Cloud Firestore.");
+          // Instantly sync the merged/repaired version back to Firestore to heal any stale structures
+          await savePersistedData();
         }
       }
     } catch (cloudErr) {

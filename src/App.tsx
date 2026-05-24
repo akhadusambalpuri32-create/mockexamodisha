@@ -26,6 +26,299 @@ import {
   GraduationCap, BookOpen, Trophy, Sparkles, Download, PlayCircle, ShieldAlert, BadgeInfo, LogOut, LayoutDashboard, Heart, Settings, Flame, Bell, MapPin, User, ChevronRight, Menu, X, ToggleLeft
 } from "lucide-react";
 
+const BASE_MOCKS_PRESETS = {
+  board: [
+    {
+      id: "cbse-board",
+      name: "CBSE - Central Board of Secondary Education",
+      short: "CBSE",
+      category: "board",
+      subCategory: "cbse",
+      durationMins: 90,
+      totalQuestions: 5,
+      difficulty: "Medium",
+      marksPerQuestion: 1,
+      negativeMarking: 0,
+      tests: [
+        { id: "cbse-10-mth", title: "CBSE Class 10th Mathematics Mock MCQ", isFree: true },
+        { id: "cbse-10-sci", title: "CBSE Class 10th General Science Mock MCQ", isFree: true }
+      ]
+    },
+    {
+      id: "bse-board",
+      name: "BSE - Board of Secondary Education, Odisha",
+      short: "BSE",
+      category: "board",
+      subCategory: "bse",
+      durationMins: 90,
+      totalQuestions: 5,
+      difficulty: "Medium",
+      marksPerQuestion: 1,
+      negativeMarking: 0,
+      tests: [
+        { id: "bse-9-mth", title: "BSE Odisha Class 9th Mathematics Mock", isFree: true },
+        { id: "bse-10-mth", title: "BSE Odisha Class 10th Board practice paper", isFree: true }
+      ]
+    },
+    {
+      id: "chse-board",
+      name: "CHSE - Council of Higher Secondary Education, Odisha",
+      short: "CHSE",
+      category: "board",
+      subCategory: "chse",
+      durationMins: 120,
+      totalQuestions: 5,
+      difficulty: "Hard",
+      marksPerQuestion: 1,
+      negativeMarking: 0,
+      tests: [
+        { id: "chse-12-phy", title: "CHSE Class 12th Physics (Electrostatics + Optics)", isFree: true },
+        { id: "chse-12-mth", title: "CHSE Class 12th Calculus & Vectors", isFree: true }
+      ]
+    }
+  ],
+  teaching: [
+    {
+      id: "otet",
+      name: "OTET - Odisha Teacher Eligibility Test",
+      short: "OTET",
+      category: "teaching",
+      subCategory: "otet",
+      durationMins: 150,
+      totalQuestions: 5,
+      difficulty: "Medium",
+      marksPerQuestion: 1,
+      negativeMarking: 0,
+      tests: [
+        { id: "otet-p1-arts", title: "OTET Paper-I (Arts Group) Child Development", isFree: true },
+        { id: "otet-p1-sci", title: "OTET Paper-I (Science Group) Mathematics & EVS", isFree: true }
+      ]
+    },
+    {
+      id: "osstet",
+      name: "OSSTET - Secondary School Teacher Eligibility",
+      short: "OSSTET",
+      category: "teaching",
+      subCategory: "osstet",
+      durationMins: 150,
+      totalQuestions: 5,
+      difficulty: "Medium-Hard",
+      marksPerQuestion: 1,
+      negativeMarking: 0,
+      tests: [
+        { id: "osstet-tgt-arts", title: "OSSTET TGT ARTS - English & Odia Pedagogy", isFree: true }
+      ]
+    },
+    {
+      id: "ossc-tgt",
+      name: "OSSC TGT - Trained Graduate Teacher recruitment",
+      short: "OSSC TGT",
+      category: "teaching",
+      subCategory: "ossc_tgt",
+      durationMins: 150,
+      totalQuestions: 5,
+      difficulty: "Hard",
+      marksPerQuestion: 1,
+      negativeMarking: 0.25,
+      tests: [
+        { id: "ossc-tgt-arts", title: "OSSC TGT ARTS Specialist Test", isFree: true }
+      ]
+    },
+    {
+      id: "ssb-tgt",
+      name: "SSB TGT - State Selection Board Teacher recruitment",
+      short: "SSB TGT",
+      category: "teaching",
+      subCategory: "ssb_tgt",
+      durationMins: 150,
+      totalQuestions: 5,
+      difficulty: "Hard",
+      marksPerQuestion: 1,
+      negativeMarking: 0.25,
+      tests: [
+        { id: "ssb-tgt-arts", title: "SSB TGT ARTS - History, Civics & Land laws", isFree: true }
+      ]
+    },
+    {
+      id: "jt",
+      name: "JT - Junior Teacher Primary & Upper Primary",
+      short: "JT",
+      category: "teaching",
+      subCategory: "jt",
+      durationMins: 120,
+      totalQuestions: 5,
+      difficulty: "Medium",
+      marksPerQuestion: 1,
+      negativeMarking: 0.25,
+      tests: [
+        { id: "jt-p1-arts", title: "JT Paper-I Arts Section practice", isFree: true }
+      ]
+    },
+    {
+      id: "pet",
+      name: "P.ET - Physical Education Teacher specialization",
+      short: "P.ET",
+      category: "teaching",
+      subCategory: "pet",
+      durationMins: 90,
+      totalQuestions: 5,
+      difficulty: "Medium",
+      marksPerQuestion: 1,
+      negativeMarking: 0.25,
+      tests: [
+        { id: "pet-general", title: "P.ET - General Physical Education, Anatomy & Rules of Sports", isFree: true }
+      ]
+    },
+    {
+      id: "bed-entrance",
+      name: "B.Ed. Entrance Exam - State quota seats",
+      short: "B.ED Entrance",
+      category: "teaching",
+      subCategory: "bed_entrance",
+      durationMins: 120,
+      totalQuestions: 5,
+      difficulty: "Medium-Hard",
+      marksPerQuestion: 1,
+      negativeMarking: 0.25,
+      tests: [
+        { id: "bed-arts", title: "B.ED Entrance Exam - Arts Section Mock", isFree: true }
+      ]
+    },
+    {
+      id: "deled-entrance",
+      name: "D.El.Ed / CT Entrance - Primary teacher certification",
+      short: "DELED / CT",
+      category: "teaching",
+      subCategory: "deled_entrance",
+      durationMins: 90,
+      totalQuestions: 5,
+      difficulty: "Medium",
+      marksPerQuestion: 1,
+      negativeMarking: 0.25,
+      tests: [
+        { id: "ct-integrated", title: "CT/DELED Entrance General Ability integrated test", isFree: true }
+      ]
+    }
+  ],
+  competitive: [
+    {
+      id: "opsc-ocs",
+      name: "OPSC - Odisha Civil Services (Pre)",
+      short: "OPSC OCS",
+      category: "competitive",
+      subCategory: "opsc_ocs",
+      durationMins: 120,
+      totalQuestions: 5,
+      difficulty: "Hard",
+      marksPerQuestion: 2,
+      negativeMarking: 0.33,
+      tests: [
+        { id: "ocs-pre-1", title: "OCS General Studies Paper-I (Mock 1)", isFree: true }
+      ]
+    },
+    {
+      id: "osssc-ri",
+      name: "OSSSC Revenue Inspector (RI)",
+      short: "OSSSC RI",
+      category: "competitive",
+      subCategory: "osssc_ri",
+      durationMins: 90,
+      totalQuestions: 3,
+      difficulty: "Medium",
+      marksPerQuestion: 1,
+      negativeMarking: 0.25,
+      tests: [
+        { id: "ri-full-1", title: "Revenue Inspector Full Mock Test 1", isFree: true }
+      ]
+    },
+    {
+      id: "ossc-cgl",
+      name: "OSSC Combined Graduate Level",
+      short: "OSSC CGL",
+      category: "competitive",
+      subCategory: "ossc_cgl",
+      durationMins: 150,
+      totalQuestions: 5,
+      difficulty: "Medium",
+      marksPerQuestion: 1,
+      negativeMarking: 0.25,
+      tests: [
+        { id: "cgl-pre-1", title: "OSSC CGL Prelims Crack Full Mock", isFree: true }
+      ]
+    }
+  ],
+  others: [
+    {
+      id: "police-si",
+      name: "Odisha Police SI & Constable",
+      short: "Police SI",
+      category: "others",
+      subCategory: "police_si",
+      durationMins: 120,
+      totalQuestions: 5,
+      difficulty: "Medium",
+      marksPerQuestion: 1,
+      negativeMarking: 0.25,
+      tests: [
+        { id: "police-si-1", title: "Odisha Police SI Mains Mock Test", isFree: true }
+      ]
+    },
+    {
+      id: "computer-skill",
+      name: "OSSSC Computer Practical Mock",
+      short: "Computer Skill",
+      category: "others",
+      subCategory: "computer_skill",
+      durationMins: 60,
+      totalQuestions: 5,
+      difficulty: "Easy-Medium",
+      marksPerQuestion: 1,
+      negativeMarking: 0,
+      tests: [
+        { id: "comp-skill-1", title: "Windows & MS Office objective practice", isFree: true }
+      ]
+    }
+  ]
+};
+
+const healExamsWithBaseMocks = (fetchedData: any, baseMocks: any) => {
+  if (!fetchedData || typeof fetchedData !== "object") return baseMocks;
+  
+  const healed = { ...fetchedData };
+  const categories = ["board", "teaching", "competitive", "others"];
+
+  categories.forEach((cat) => {
+    if (!healed[cat]) healed[cat] = [];
+    const baseList = baseMocks[cat] || [];
+
+    baseList.forEach((baseExam: any) => {
+      const foundIdx = healed[cat].findIndex((e: any) => e.id === baseExam.id);
+      if (foundIdx === -1) {
+        // Predefined exam completely missing from fetched list - recover it!
+        healed[cat].push(JSON.parse(JSON.stringify(baseExam)));
+      } else {
+        // Predefined exam exists - ensure ALL predefined tests are retained
+        const fetchedExam = healed[cat][foundIdx];
+        const mergedTests = [...(fetchedExam.tests || [])];
+        
+        (baseExam.tests || []).forEach((baseTest: any) => {
+          if (!mergedTests.some((t: any) => t.id === baseTest.id)) {
+            mergedTests.push(JSON.parse(JSON.stringify(baseTest)));
+          }
+        });
+
+        healed[cat][foundIdx] = {
+          ...baseExam,
+          ...fetchedExam,
+          tests: mergedTests
+        };
+      }
+    });
+  });
+
+  return healed;
+};
+
 const mergeWithLocalExams = (serverExams: any) => {
   const localExamsStr = localStorage.getItem("kalinga_custom_exams_db");
   if (!localExamsStr) return serverExams;
@@ -366,7 +659,13 @@ export default function App() {
     const fetchExams = async () => {
       let loadedData: any = null;
       try {
-        const response = await fetch("/api/exams-data");
+        // Use cache-buster to completely bypass any routing/browser caching of configuration
+        const response = await fetch(`/api/exams-data?t=${Date.now()}`, {
+          headers: {
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache'
+          }
+        });
         if (response.ok) {
           loadedData = await response.json();
         }
@@ -375,8 +674,10 @@ export default function App() {
       }
 
       if (loadedData) {
-        setExamsData(loadedData);
-        localStorage.setItem("kalinga_custom_exams_db", JSON.stringify(loadedData));
+        const healedData = healExamsWithBaseMocks(loadedData, BASE_MOCKS_PRESETS);
+        const fullyMerged = mergeWithLocalExams(healedData);
+        setExamsData(fullyMerged);
+        localStorage.setItem("kalinga_custom_exams_db", JSON.stringify(fullyMerged));
       } else {
         // Build dynamic fallback using cached client-side db or the custom mocks
         const cachedExams = localStorage.getItem("kalinga_custom_exams_db");
@@ -387,262 +688,8 @@ export default function App() {
           } catch (e) {}
         }
 
-        // If even local storage is empty, fallback to basic mock exams
-        const baseMocks = {
-          board: [
-            {
-              id: "cbse-board",
-              name: "CBSE - Central Board of Secondary Education",
-              short: "CBSE",
-              category: "board",
-              subCategory: "cbse",
-              durationMins: 90,
-              totalQuestions: 5,
-              difficulty: "Medium",
-              marksPerQuestion: 1,
-              negativeMarking: 0,
-              tests: [
-                { id: "cbse-10-mth", title: "CBSE Class 10th Mathematics Mock MCQ", isFree: true },
-                { id: "cbse-10-sci", title: "CBSE Class 10th General Science Mock MCQ", isFree: true }
-              ]
-            },
-            {
-              id: "bse-board",
-              name: "BSE - Board of Secondary Education, Odisha",
-              short: "BSE",
-              category: "board",
-              subCategory: "bse",
-              durationMins: 90,
-              totalQuestions: 5,
-              difficulty: "Medium",
-              marksPerQuestion: 1,
-              negativeMarking: 0,
-              tests: [
-                { id: "bse-9-mth", title: "BSE Odisha Class 9th Mathematics Mock", isFree: true },
-                { id: "bse-10-mth", title: "BSE Odisha Class 10th Board practice paper", isFree: true }
-              ]
-            },
-            {
-              id: "chse-board",
-              name: "CHSE - Council of Higher Secondary Education, Odisha",
-              short: "CHSE",
-              category: "board",
-              subCategory: "chse",
-              durationMins: 120,
-              totalQuestions: 5,
-              difficulty: "Hard",
-              marksPerQuestion: 1,
-              negativeMarking: 0,
-              tests: [
-                { id: "chse-12-phy", title: "CHSE Class 12th Physics (Electrostatics + Optics)", isFree: true },
-                { id: "chse-12-mth", title: "CHSE Class 12th Calculus & Vectors", isFree: true }
-              ]
-            }
-          ],
-          teaching: [
-            {
-              id: "otet",
-              name: "OTET - Odisha Teacher Eligibility Test",
-              short: "OTET",
-              category: "teaching",
-              subCategory: "otet",
-              durationMins: 150,
-              totalQuestions: 5,
-              difficulty: "Medium",
-              marksPerQuestion: 1,
-              negativeMarking: 0,
-              tests: [
-                { id: "otet-p1-arts", title: "OTET Paper-I (Arts Group) Child Development", isFree: true },
-                { id: "otet-p1-sci", title: "OTET Paper-I (Science Group) Mathematics & EVS", isFree: true }
-              ]
-            },
-            {
-              id: "osstet",
-              name: "OSSTET - Secondary School Teacher Eligibility",
-              short: "OSSTET",
-              category: "teaching",
-              subCategory: "osstet",
-              durationMins: 150,
-              totalQuestions: 5,
-              difficulty: "Medium-Hard",
-              marksPerQuestion: 1,
-              negativeMarking: 0,
-              tests: [
-                { id: "osstet-tgt-arts", title: "OSSTET TGT ARTS - English & Odia Pedagogy", isFree: true }
-              ]
-            },
-            {
-              id: "ossc-tgt",
-              name: "OSSC TGT - Trained Graduate Teacher recruitment",
-              short: "OSSC TGT",
-              category: "teaching",
-              subCategory: "ossc_tgt",
-              durationMins: 150,
-              totalQuestions: 5,
-              difficulty: "Hard",
-              marksPerQuestion: 1,
-              negativeMarking: 0.25,
-              tests: [
-                { id: "ossc-tgt-arts", title: "OSSC TGT ARTS Specialist Test", isFree: true }
-              ]
-            },
-            {
-              id: "ssb-tgt",
-              name: "SSB TGT - State Selection Board Teacher recruitment",
-              short: "SSB TGT",
-              category: "teaching",
-              subCategory: "ssb_tgt",
-              durationMins: 150,
-              totalQuestions: 5,
-              difficulty: "Hard",
-              marksPerQuestion: 1,
-              negativeMarking: 0.25,
-              tests: [
-                { id: "ssb-tgt-arts", title: "SSB TGT ARTS - History, Civics & Land laws", isFree: true }
-              ]
-            },
-            {
-              id: "jt",
-              name: "JT - Junior Teacher Primary & Upper Primary",
-              short: "JT",
-              category: "teaching",
-              subCategory: "jt",
-              durationMins: 120,
-              totalQuestions: 5,
-              difficulty: "Medium",
-              marksPerQuestion: 1,
-              negativeMarking: 0.25,
-              tests: [
-                { id: "jt-p1-arts", title: "JT Paper-I Arts Section practice", isFree: true }
-              ]
-            },
-            {
-              id: "pet",
-              name: "P.ET - Physical Education Teacher specialization",
-              short: "P.ET",
-              category: "teaching",
-              subCategory: "pet",
-              durationMins: 90,
-              totalQuestions: 5,
-              difficulty: "Medium",
-              marksPerQuestion: 1,
-              negativeMarking: 0.25,
-              tests: [
-                { id: "pet-general", title: "P.ET - General Physical Education, Anatomy & Rules of Sports", isFree: true }
-              ]
-            },
-            {
-              id: "bed-entrance",
-              name: "B.Ed. Entrance Exam - State quota seats",
-              short: "B.ED Entrance",
-              category: "teaching",
-              subCategory: "bed_entrance",
-              durationMins: 120,
-              totalQuestions: 5,
-              difficulty: "Medium-Hard",
-              marksPerQuestion: 1,
-              negativeMarking: 0.25,
-              tests: [
-                { id: "bed-arts", title: "B.ED Entrance Exam - Arts Section Mock", isFree: true }
-              ]
-            },
-            {
-              id: "deled-entrance",
-              name: "D.El.Ed / CT Entrance - Primary teacher certification",
-              short: "DELED / CT",
-              category: "teaching",
-              subCategory: "deled_entrance",
-              durationMins: 90,
-              totalQuestions: 5,
-              difficulty: "Medium",
-              marksPerQuestion: 1,
-              negativeMarking: 0.25,
-              tests: [
-                { id: "ct-integrated", title: "CT/DELED Entrance General Ability integrated test", isFree: true }
-              ]
-            }
-          ],
-          competitive: [
-            {
-              id: "opsc-ocs",
-              name: "OPSC - Odisha Civil Services (Pre)",
-              short: "OPSC OCS",
-              category: "competitive",
-              subCategory: "opsc_ocs",
-              durationMins: 120,
-              totalQuestions: 5,
-              difficulty: "Hard",
-              marksPerQuestion: 2,
-              negativeMarking: 0.33,
-              tests: [
-                { id: "ocs-pre-1", title: "OCS General Studies Paper-I (Mock 1)", isFree: true }
-              ]
-            },
-            {
-              id: "osssc-ri",
-              name: "OSSSC Revenue Inspector (RI)",
-              short: "OSSSC RI",
-              category: "competitive",
-              subCategory: "osssc_ri",
-              durationMins: 90,
-              totalQuestions: 3,
-              difficulty: "Medium",
-              marksPerQuestion: 1,
-              negativeMarking: 0.25,
-              tests: [
-                { id: "ri-full-1", title: "Revenue Inspector Full Mock Test 1", isFree: true }
-              ]
-            },
-            {
-              id: "ossc-cgl",
-              name: "OSSC Combined Graduate Level",
-              short: "OSSC CGL",
-              category: "competitive",
-              subCategory: "ossc_cgl",
-              durationMins: 150,
-              totalQuestions: 5,
-              difficulty: "Medium",
-              marksPerQuestion: 1,
-              negativeMarking: 0.25,
-              tests: [
-                { id: "cgl-pre-1", title: "OSSC CGL Prelims Crack Full Mock", isFree: true }
-              ]
-            }
-          ],
-          others: [
-            {
-              id: "police-si",
-              name: "Odisha Police SI & Constable",
-              short: "Police SI",
-              category: "others",
-              subCategory: "police_si",
-              durationMins: 120,
-              totalQuestions: 5,
-              difficulty: "Medium",
-              marksPerQuestion: 1,
-              negativeMarking: 0.25,
-              tests: [
-                { id: "police-si-1", title: "Odisha Police SI Mains Mock Test", isFree: true }
-              ]
-            },
-            {
-              id: "computer-skill",
-              name: "OSSSC Computer Practical Mock",
-              short: "Computer Skill",
-              category: "others",
-              subCategory: "computer_skill",
-              durationMins: 60,
-              totalQuestions: 5,
-              difficulty: "Easy-Medium",
-              marksPerQuestion: 1,
-              negativeMarking: 0,
-              tests: [
-                { id: "comp-skill-1", title: "Windows & MS Office objective practice", isFree: true }
-              ]
-            }
-          ]
-        };
-        const mergedBase = mergeWithLocalExams(baseMocks);
+        // If even local storage is empty, fallback to base mocks presets
+        const mergedBase = mergeWithLocalExams(BASE_MOCKS_PRESETS);
         setExamsData(mergedBase);
         localStorage.setItem("kalinga_custom_exams_db", JSON.stringify(mergedBase));
       }

@@ -26,7 +26,8 @@ try {
   console.error("❌ [FIREBASE SERVER] Failed to initialize:", error);
 }
 
-app.use(express.json());
+app.use(express.json({ limit: "50mb" }));
+app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
 // Initialize Gemini API Client safely (Lazy Initialization / Graceful check)
 let aiClient: GoogleGenAI | null = null;
@@ -519,7 +520,7 @@ function repairAndMergeExams(loadedExams: any): any {
 
   categories.forEach(cat => {
     const originalList = ORIGINAL_STATIC_EXAMS[cat] || [];
-    const loadedList = loadedExams[cat] || [];
+    const loadedList = Array.isArray(loadedExams[cat]) ? loadedExams[cat] : [];
 
     // 1. Maintain and repair each predefined original exam structure
     originalList.forEach((origExam: any) => {
@@ -1452,7 +1453,7 @@ ${rawText}
   // Populate actual active mock test questions list in-memory!
   QUESTIONS_DATABASE[finalTargetTestId] = finalQuestions;
 
-  savePersistedData();
+  await savePersistedData();
 
   res.json({
     success: true,
@@ -1504,7 +1505,7 @@ app.post("/api/admin/edit-test", async (req, res) => {
   }
   test.editedAt = new Date().toISOString();
 
-  savePersistedData();
+  await savePersistedData();
 
   res.json({ success: true, test, exams_database: EXAMS_DATABASE });
 });
@@ -1538,7 +1539,7 @@ app.post("/api/admin/delete-test", async (req, res) => {
   // Clean up questions
   delete QUESTIONS_DATABASE[testId];
 
-  savePersistedData();
+  await savePersistedData();
 
   res.json({ success: true, message: "Mock test series completely removed from live database.", exams_database: EXAMS_DATABASE });
 });

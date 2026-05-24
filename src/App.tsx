@@ -1498,11 +1498,18 @@ export default function App() {
                   userProfile={userProfile}
                   onReloadExams={async () => {
                     try {
-                      const response = await fetch("/api/exams-data");
+                      const response = await fetch(`/api/exams-data?t=${Date.now()}`, {
+                        headers: {
+                          'Cache-Control': 'no-cache',
+                          'Pragma': 'no-cache'
+                        }
+                      });
                       if (response.ok) {
                         const data = await response.json();
-                        setExamsData(data);
-                        localStorage.setItem("kalinga_custom_exams_db", JSON.stringify(data));
+                        const healedData = healExamsWithBaseMocks(data, BASE_MOCKS_PRESETS);
+                        const fullyMerged = mergeWithLocalExams(healedData);
+                        setExamsData(fullyMerged);
+                        localStorage.setItem("kalinga_custom_exams_db", JSON.stringify(fullyMerged));
                       }
                     } catch (e) {
                       console.error("Failed to reload dynamic exams database:", e);

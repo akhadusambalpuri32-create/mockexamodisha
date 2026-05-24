@@ -306,11 +306,22 @@ export default function AdminPanel({ exams, onReloadExams, userProfile }: AdminP
       });
 
       clearInterval(interval);
-      const result = await response.json();
-
+      
+      let result;
       if (!response.ok) {
-        throw new Error(result.error || "Failed to process test sheet document.");
+        let errorText = "Failed to process test sheet document.";
+        try {
+          const errRes = await response.json();
+          errorText = errRes.error || errorText;
+        } catch (_) {
+          try {
+            errorText = await response.text();
+          } catch (_) {}
+        }
+        throw new Error(errorText);
       }
+
+      result = await response.json();
 
       setParseStatus("Committing database sync...");
       if (result.exams_database) {

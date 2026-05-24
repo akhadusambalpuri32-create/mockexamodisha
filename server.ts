@@ -1263,42 +1263,43 @@ app.post("/api/ai/analyze-performance", async (req, res) => {
 // 11. Custom Admin AI Word Document/Text Sheet MCQ Mock Test Parser
 app.post("/api/admin/parse-test", async (req, res) => {
   try {
-    await ensureDataLoaded();
-  } catch (err) {
-    console.error("ensureDataLoaded failure in parse-test:", err);
-  }
-
-  const {
-    rawText,
-    examCategory, // board | teaching | competitive | others
-    examId,       // e.g. cbse-board
-    testId,       // existing testId or "new"
-    newTestTitle, // parsed title
-    durationMins,
-    negativeMarking,
-    marksPerQuestion
-  } = req.body;
-
-  if (!rawText || !rawText.trim()) {
-    return res.status(400).json({ error: "Missing mock test sheet raw text content." });
-  }
-
-  const ai = getAi();
-  let parsedQuestions: any[] = [];
-  let mode = "AI";
-
-  if (!ai) {
-    console.warn("GEMINI_API_KEY placeholder or unassigned. Falling back manually to regex-based local text parser.");
-    parsedQuestions = parseWithRegexFallback(rawText);
-    mode = "Regex Sim Parser";
-  } else {
     try {
-      const systemInstruction = 
-        "You are an elite, highly precise educational content converter for Odisha state examinations (OPSC, OSSSC, OSSC, BSE, CHSE). " +
-        "You convert raw typed exam questionnaires, study sheets, or copy-pasted Word documents containing MCQs into perfectly structured JSON format. " +
-        "Strictly adhere to the provided schema.";
+      await ensureDataLoaded();
+    } catch (err) {
+      console.error("ensureDataLoaded failure in parse-test:", err);
+    }
 
-      const promptText = `Please parse the following copied MCQ test sheets into JSON questions conforming to the requested schema. 
+    const {
+      rawText,
+      examCategory, // board | teaching | competitive | others
+      examId,       // e.g. cbse-board
+      testId,       // existing testId or "new"
+      newTestTitle, // parsed title
+      durationMins,
+      negativeMarking,
+      marksPerQuestion
+    } = req.body;
+
+    if (!rawText || !rawText.trim()) {
+      return res.status(400).json({ error: "Missing mock test sheet raw text content." });
+    }
+
+    const ai = getAi();
+    let parsedQuestions: any[] = [];
+    let mode = "AI";
+
+    if (!ai) {
+      console.warn("GEMINI_API_KEY placeholder or unassigned. Falling back manually to regex-based local text parser.");
+      parsedQuestions = parseWithRegexFallback(rawText);
+      mode = "Regex Sim Parser";
+    } else {
+      try {
+        const systemInstruction = 
+          "You are an elite, highly precise educational content converter for Odisha state examinations (OPSC, OSSSC, OSSC, BSE, CHSE). " +
+          "You convert raw typed exam questionnaires, study sheets, or copy-pasted Word documents containing MCQs into perfectly structured JSON format. " +
+          "Strictly adhere to the provided schema.";
+
+        const promptText = `Please parse the following copied MCQ test sheets into JSON questions conforming to the requested schema. 
 Each question MUST have exactly 4 choices (options). 
 Extract the 0-based key correctIndex where A=0, B=1, C=2, D=3.
 If there are minor explanations in the text, clean them up and use them. Otherwise, write a highly descriptive explanation yourself.
@@ -1309,239 +1310,279 @@ Raw text document content:
 ${rawText}
 ---`;
 
-      const response = await ai.models.generateContent({
-        model: "gemini-3.5-flash",
-        contents: promptText,
-        config: {
-          systemInstruction,
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              questions: {
-                type: Type.ARRAY,
-                items: {
-                  type: Type.OBJECT,
-                  properties: {
-                    question: { type: Type.STRING },
-                    options: {
-                      type: Type.ARRAY,
-                      items: { type: Type.STRING }
+        const response = await ai.models.generateContent({
+          model: "gemini-3.5-flash",
+          contents: promptText,
+          config: {
+            systemInstruction,
+            responseMimeType: "application/json",
+            responseSchema: {
+              type: Type.OBJECT,
+              properties: {
+                questions: {
+                  type: Type.ARRAY,
+                  items: {
+                    type: Type.OBJECT,
+                    properties: {
+                      question: { type: Type.STRING },
+                      options: {
+                        type: Type.ARRAY,
+                        items: { type: Type.STRING }
+                      },
+                      correctIndex: { type: Type.INTEGER, description: "0-based correct choice (A=0, B=1, C=2, D=3)" },
+                      explanation: { type: Type.STRING },
+                      subject: { type: Type.STRING },
+                      topic: { type: Type.STRING }
                     },
-                    correctIndex: { type: Type.INTEGER, description: "0-based correct choice (A=0, B=1, C=2, D=3)" },
-                    explanation: { type: Type.STRING },
-                    subject: { type: Type.STRING },
-                    topic: { type: Type.STRING }
-                  },
-                  required: ["question", "options", "correctIndex", "explanation"]
+                    required: ["question", "options", "correctIndex", "explanation"]
+                  }
                 }
-              }
-            },
-            required: ["questions"]
+              },
+              required: ["questions"]
+            }
           }
+        });
+
+        const parsedJson = JSON.parse(response.text.trim());
+        if (parsedJson && Array.isArray(parsedJson.questions)) {
+          parsedQuestions = parsedJson.questions;
+        } else {
+          throw new Error("Returned JSON did not match expected 'questions' list schema.");
         }
-      });
-
-      const parsedJson = JSON.parse(response.text.trim());
-      if (parsedJson && Array.isArray(parsedJson.questions)) {
-        parsedQuestions = parsedJson.questions;
-      } else {
-        throw new Error("Returned JSON did not match expected 'questions' list schema.");
-      }
-    } catch (err: any) {
-      console.warn("Gemini Parsing error. Engaging intelligent Regex parser to prevent application disruption:", err);
-      parsedQuestions = parseWithRegexFallback(rawText);
-      mode = "Regex Recovery Parser";
-    }
-  }
-
-  // Sanitize / Add IDs
-  const finalQuestions = parsedQuestions.map((q, idx) => {
-    // Generate standard schema conforming values
-    const safeOptions = Array.isArray(q.options) && q.options.length >= 2 
-      ? q.options.slice(0, 4) 
-      : ["Option A", "Option B", "Option C", "Option D"];
-    while (safeOptions.length < 4) {
-      safeOptions.push(`Option ${String.fromCharCode(65 + safeOptions.length)}`);
-    }
-
-    return {
-      id: `${examId || "parsed"}-q-${idx + 1}-${Math.floor(Math.random() * 1000)}`,
-      question: q.question || "Parsed Mock Practice Question",
-      options: safeOptions,
-      correctIndex: typeof q.correctIndex === "number" && q.correctIndex >= 0 && q.correctIndex < 4 ? q.correctIndex : 0,
-      explanation: q.explanation || "Direct curriculum reference evaluated.",
-      shortExplanation: q.explanation || "Direct curriculum reference.",
-      subject: q.subject || "General Syllabus",
-      topic: q.topic || "Core Practice",
-      passage: q.passage || undefined
-    };
-  });
-
-  // Apply to Database
-  const finalQuantity = finalQuestions.length;
-  if (finalQuantity === 0) {
-    return res.status(422).json({ error: "Failed to recognize any valid MCQs in the provided text. Please verify formatting: '1. Question...', 'A)...', 'Answer: A'" });
-  }
-
-  let finalTargetTestId = testId;
-
-  // Locate or Create dynamically inside EXAMS_DATABASE
-  const activeExams: any = EXAMS_DATABASE;
-  const categoriesList = ["board", "teaching", "competitive", "others"];
-  let matchedExamBlock: any = null;
-
-  for (const cat of categoriesList) {
-    if (activeExams[cat]) {
-      const match = activeExams[cat].find((e: any) => e.id === examId);
-      if (match) {
-        matchedExamBlock = match;
-        break;
+      } catch (err: any) {
+        console.warn("Gemini Parsing error. Engaging intelligent Regex parser to prevent application disruption:", err);
+        parsedQuestions = parseWithRegexFallback(rawText);
+        mode = "Regex Recovery Parser";
       }
     }
-  }
 
-  if (testId === "new") {
-    finalTargetTestId = `${examId}-parsed-${Math.floor(Math.random() * 900) + 100}`;
-    const newTestObj = {
-      id: finalTargetTestId,
-      title: newTestTitle || "General Practice MCQ Mock Set",
-      isFree: true,
-      isCustom: true,
-      questionsCount: finalQuantity,
-      durationMins: Number(durationMins) || 90,
-      negativeMarking: Number(negativeMarking) || 0,
-      marksPerQuestion: Number(marksPerQuestion) || 1,
-      uploadedAt: new Date().toISOString(),
-      category: examCategory,
-      examId: examId
-    };
+    // Sanitize / Add IDs
+    const finalQuestions = parsedQuestions.map((q, idx) => {
+      // Generate standard schema conforming values
+      const safeOptions = Array.isArray(q.options) && q.options.length >= 2 
+        ? q.options.slice(0, 4) 
+        : ["Option A", "Option B", "Option C", "Option D"];
+      while (safeOptions.length < 4) {
+        safeOptions.push(`Option ${String.fromCharCode(65 + safeOptions.length)}`);
+      }
 
-    if (matchedExamBlock) {
-      if (!matchedExamBlock.tests) matchedExamBlock.tests = [];
-      matchedExamBlock.tests.push(newTestObj);
-      matchedExamBlock.totalQuestions = finalQuantity;
-      matchedExamBlock.durationMins = Number(durationMins) || 90;
-      matchedExamBlock.negativeMarking = Number(negativeMarking) || 0;
-      matchedExamBlock.marksPerQuestion = Number(marksPerQuestion) || 1;
+      return {
+        id: `${examId || "parsed"}-q-${idx + 1}-${Math.floor(Math.random() * 1000)}`,
+        question: q.question || "Parsed Mock Practice Question",
+        options: safeOptions,
+        correctIndex: typeof q.correctIndex === "number" && q.correctIndex >= 0 && q.correctIndex < 4 ? q.correctIndex : 0,
+        explanation: q.explanation || "Direct curriculum reference evaluated.",
+        shortExplanation: q.explanation || "Direct curriculum reference.",
+        subject: q.subject || "General Syllabus",
+        topic: q.topic || "Core Practice",
+        passage: q.passage || undefined
+      };
+    });
+
+    // Apply to Database
+    const finalQuantity = finalQuestions.length;
+    if (finalQuantity === 0) {
+      return res.status(422).json({ error: "Failed to recognize any valid MCQs in the provided text. Please verify formatting: '1. Question...', 'A)...', 'Answer: A'" });
     }
-  } else {
-    // Modify existing test
-    if (matchedExamBlock) {
-      const test = matchedExamBlock.tests?.find((t: any) => t.id === testId);
-      if (test) {
-        if (newTestTitle) {
-          test.title = newTestTitle;
-        }
-        test.isCustom = true;
-        test.questionsCount = finalQuantity;
-        test.durationMins = Number(durationMins) || 90;
-        test.negativeMarking = Number(negativeMarking) || 0;
-        test.marksPerQuestion = Number(marksPerQuestion) || 1;
-        test.uploadedAt = new Date().toISOString();
-        test.category = examCategory;
-        test.examId = examId;
 
+    let finalTargetTestId = testId;
+
+    // Locate or Create dynamically inside EXAMS_DATABASE
+    const activeExams: any = EXAMS_DATABASE;
+    const categoriesList = ["board", "teaching", "competitive", "others"];
+    let matchedExamBlock: any = null;
+
+    for (const cat of categoriesList) {
+      if (activeExams[cat]) {
+        const match = activeExams[cat].find((e: any) => e.id === examId);
+        if (match) {
+          matchedExamBlock = match;
+          break;
+        }
+      }
+    }
+
+    if (testId === "new") {
+      finalTargetTestId = `${examId}-parsed-${Math.floor(Math.random() * 900) + 100}`;
+      const newTestObj = {
+        id: finalTargetTestId,
+        title: newTestTitle || "General Practice MCQ Mock Set",
+        isFree: true,
+        isCustom: true,
+        questionsCount: finalQuantity,
+        durationMins: Number(durationMins) || 90,
+        negativeMarking: Number(negativeMarking) || 0,
+        marksPerQuestion: Number(marksPerQuestion) || 1,
+        uploadedAt: new Date().toISOString(),
+        category: examCategory,
+        examId: examId
+      };
+
+      if (matchedExamBlock) {
+        if (!matchedExamBlock.tests) matchedExamBlock.tests = [];
+        matchedExamBlock.tests.push(newTestObj);
         matchedExamBlock.totalQuestions = finalQuantity;
         matchedExamBlock.durationMins = Number(durationMins) || 90;
         matchedExamBlock.negativeMarking = Number(negativeMarking) || 0;
         matchedExamBlock.marksPerQuestion = Number(marksPerQuestion) || 1;
       }
+    } else {
+      // Modify existing test
+      if (matchedExamBlock) {
+        const test = matchedExamBlock.tests?.find((t: any) => t.id === testId);
+        if (test) {
+          if (newTestTitle) {
+            test.title = newTestTitle;
+          }
+          test.isCustom = true;
+          test.questionsCount = finalQuantity;
+          test.durationMins = Number(durationMins) || 90;
+          test.negativeMarking = Number(negativeMarking) || 0;
+          test.marksPerQuestion = Number(marksPerQuestion) || 1;
+          test.uploadedAt = new Date().toISOString();
+          test.category = examCategory;
+          test.examId = examId;
+
+          matchedExamBlock.totalQuestions = finalQuantity;
+          matchedExamBlock.durationMins = Number(durationMins) || 90;
+          matchedExamBlock.negativeMarking = Number(negativeMarking) || 0;
+          matchedExamBlock.marksPerQuestion = Number(marksPerQuestion) || 1;
+        }
+      }
     }
+
+    // Populate actual active mock test questions list in-memory!
+    QUESTIONS_DATABASE[finalTargetTestId] = finalQuestions;
+
+    await savePersistedData();
+
+    res.json({
+      success: true,
+      mode,
+      testId: finalTargetTestId,
+      questionsCount: finalQuantity,
+      category: examCategory,
+      examId,
+      questions: finalQuestions,
+      exams_database: EXAMS_DATABASE
+    });
+  } catch (error: any) {
+    console.error("❌ CRITICAL ERROR inside /api/admin/parse-test route:", error);
+    res.status(500).json({ error: error?.message || "An unhandled internal server error occurred while converting MCQ sheet." });
   }
-
-  // Populate actual active mock test questions list in-memory!
-  QUESTIONS_DATABASE[finalTargetTestId] = finalQuestions;
-
-  await savePersistedData();
-
-  res.json({
-    success: true,
-    mode,
-    testId: finalTargetTestId,
-    questionsCount: finalQuantity,
-    category: examCategory,
-    examId,
-    questions: finalQuestions,
-    exams_database: EXAMS_DATABASE
-  });
 });
 
 // 12. Edit uploaded custom mock test
 app.post("/api/admin/edit-test", async (req, res) => {
   try {
-    await ensureDataLoaded();
-  } catch (err) {
-    console.error("ensureDataLoaded failure in edit-test:", err);
-  }
-  const { category, examId, testId, title, durationMins, negativeMarking, marksPerQuestion } = req.body;
-  if (!category || !examId || !testId) {
-    return res.status(400).json({ error: "Missing required identifier fields." });
-  }
+    try {
+      await ensureDataLoaded();
+    } catch (err) {
+      console.error("ensureDataLoaded failure in edit-test:", err);
+    }
+    const { category, examId, testId, title, durationMins, negativeMarking, marksPerQuestion } = req.body;
+    if (!examId || !testId) {
+      return res.status(400).json({ error: "Missing required identifier fields." });
+    }
 
-  const activeExams: any = EXAMS_DATABASE;
-  const targetExam = activeExams[category]?.find((e: any) => e.id === examId);
-  if (!targetExam) {
-    return res.status(404).json({ error: `Target exam series ${examId} not found in category ${category}.` });
-  }
+    const activeExams: any = EXAMS_DATABASE;
+    const categoriesList = ["board", "teaching", "competitive", "others"];
+    let targetExam: any = null;
 
-  const test = targetExam.tests?.find((t: any) => t.id === testId);
-  if (!test) {
-    return res.status(404).json({ error: `Mock test ${testId} not found.` });
-  }
+    // Search across all categories to prevent mismatch errors (e.g. "others" vs "competitive")
+    for (const cat of categoriesList) {
+      if (activeExams[cat]) {
+        const match = activeExams[cat].find((e: any) => e.id === examId);
+        if (match) {
+          targetExam = match;
+          break;
+        }
+      }
+    }
 
-  if (title) test.title = title;
-  if (durationMins !== undefined) {
-    test.durationMins = Number(durationMins);
-    targetExam.durationMins = Number(durationMins);
-  }
-  if (negativeMarking !== undefined) {
-    test.negativeMarking = Number(negativeMarking);
-    targetExam.negativeMarking = Number(negativeMarking);
-  }
-  if (marksPerQuestion !== undefined) {
-    test.marksPerQuestion = Number(marksPerQuestion);
-    targetExam.marksPerQuestion = Number(marksPerQuestion);
-  }
-  test.editedAt = new Date().toISOString();
+    if (!targetExam) {
+      return res.status(404).json({ error: `Target exam series ${examId} not found in database.` });
+    }
 
-  await savePersistedData();
+    const test = targetExam.tests?.find((t: any) => t.id === testId);
+    if (!test) {
+      return res.status(404).json({ error: `Mock test ${testId} not found.` });
+    }
 
-  res.json({ success: true, test, exams_database: EXAMS_DATABASE });
+    if (title) test.title = title;
+    if (durationMins !== undefined) {
+      test.durationMins = Number(durationMins);
+      targetExam.durationMins = Number(durationMins);
+    }
+    if (negativeMarking !== undefined) {
+      test.negativeMarking = Number(negativeMarking);
+      targetExam.negativeMarking = Number(negativeMarking);
+    }
+    if (marksPerQuestion !== undefined) {
+      test.marksPerQuestion = Number(marksPerQuestion);
+      targetExam.marksPerQuestion = Number(marksPerQuestion);
+    }
+    test.editedAt = new Date().toISOString();
+
+    await savePersistedData();
+
+    res.json({ success: true, test, exams_database: EXAMS_DATABASE });
+  } catch (error: any) {
+    console.error("❌ ERROR inside /api/admin/edit-test route:", error);
+    res.status(500).json({ error: error?.message || "An internal server error occurred while editing mock test options." });
+  }
 });
 
 // 13. Delete uploaded custom mock test
 app.post("/api/admin/delete-test", async (req, res) => {
   try {
-    await ensureDataLoaded();
-  } catch (err) {
-    console.error("ensureDataLoaded failure in delete-test:", err);
+    try {
+      await ensureDataLoaded();
+    } catch (err) {
+      console.error("ensureDataLoaded failure in delete-test:", err);
+    }
+    const { category, examId, testId } = req.body;
+    if (!examId || !testId) {
+      return res.status(400).json({ error: "Missing required identifier fields." });
+    }
+
+    const activeExams: any = EXAMS_DATABASE;
+    const categoriesList = ["board", "teaching", "competitive", "others"];
+    let targetExam: any = null;
+
+    // Search across all categories to prevent mismatch errors (e.g. "others" vs "competitive")
+    for (const cat of categoriesList) {
+      if (activeExams[cat]) {
+        const match = activeExams[cat].find((e: any) => e.id === examId);
+        if (match) {
+          targetExam = match;
+          break;
+        }
+      }
+    }
+
+    if (!targetExam) {
+      return res.status(404).json({ error: `Target exam series ${examId} not found in database.` });
+    }
+
+    const testIdx = targetExam.tests?.findIndex((t: any) => t.id === testId);
+    if (testIdx === -1 || testIdx === undefined) {
+      return res.status(404).json({ error: `Mock test ${testId} not found inside exam series.` });
+    }
+
+    // Remove test
+    targetExam.tests.splice(testIdx, 1);
+    
+    // Clean up questions
+    delete QUESTIONS_DATABASE[testId];
+
+    await savePersistedData();
+
+    res.json({ success: true, message: "Mock test series completely removed from live database.", exams_database: EXAMS_DATABASE });
+  } catch (error: any) {
+    console.error("❌ ERROR inside /api/admin/delete-test route:", error);
+    res.status(500).json({ error: error?.message || "An internal server error occurred while removing mock test series." });
   }
-  const { category, examId, testId } = req.body;
-  if (!category || !examId || !testId) {
-    return res.status(400).json({ error: "Missing required identifier fields." });
-  }
-
-  const activeExams: any = EXAMS_DATABASE;
-  const targetExam = activeExams[category]?.find((e: any) => e.id === examId);
-  if (!targetExam) {
-    return res.status(404).json({ error: `Target exam series ${examId} not found.` });
-  }
-
-  const testIdx = targetExam.tests?.findIndex((t: any) => t.id === testId);
-  if (testIdx === -1 || testIdx === undefined) {
-    return res.status(404).json({ error: `Mock test ${testId} not found inside exam series.` });
-  }
-
-  // Remove test
-  targetExam.tests.splice(testIdx, 1);
-  
-  // Clean up questions
-  delete QUESTIONS_DATABASE[testId];
-
-  await savePersistedData();
-
-  res.json({ success: true, message: "Mock test series completely removed from live database.", exams_database: EXAMS_DATABASE });
 });
 
 // Helper regex parser for fallback or simulation

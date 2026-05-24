@@ -8,5 +8,9 @@ service cloud.firestore {
     match /test/{docId} {
       allow read: if true;
     }
+
+    match /admin_config/{docId} {
+      allow read, write: if true;
+    }
   }
 }

@@ -4,6 +4,7 @@ import path from 'path';
 import {defineConfig} from 'vite';
 
 export default defineConfig(() => {
+  const isProd = process.env.NODE_ENV === 'production';
   return {
     plugins: [react(), tailwindcss()],
     resolve: {
@@ -12,10 +13,10 @@ export default defineConfig(() => {
       },
     },
     server: {
-      // Disable client HMR loop entirely to stop benign browser websocket connection warnings
-      hmr: false,
+      // Disable client HMR and websockets loop entirely to stop benign browser websocket connection warnings in production
+      hmr: isProd ? false : undefined,
       // Disable active file-watching during fast-paced developer edits
-      watch: null,
+      watch: isProd ? null : undefined,
     },
   };
 });

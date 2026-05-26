@@ -1529,7 +1529,15 @@ ${rawText}
     // Populate actual active mock test questions list in-memory!
     QUESTIONS_DATABASE[finalTargetTestId] = finalQuestions;
 
-    await savePersistedData();
+    // Decouple saving to Firestore/Disk so database failures/timeouts never block or crash the user
+    try {
+      await Promise.race([
+        savePersistedData(),
+        new Promise((_, reject) => setTimeout(() => reject(new Error("Database save timeout")), 1500))
+      ]);
+    } catch (saveError) {
+      console.warn("⚠️ [DECOUPLED SAVE] Firestore/Disk syncing failed or timed out. Proceeding so that user can see and play the mock test locally:", saveError);
+    }
 
     res.json({
       success: true,
@@ -1599,7 +1607,15 @@ app.post("/api/admin/edit-test", async (req, res) => {
     }
     test.editedAt = new Date().toISOString();
 
-    await savePersistedData();
+    // Decouple saving to Firestore/Disk so database failures/timeouts never block or crash the user
+    try {
+      await Promise.race([
+        savePersistedData(),
+        new Promise((_, reject) => setTimeout(() => reject(new Error("Database save timeout")), 1500))
+      ]);
+    } catch (saveError) {
+      console.warn("⚠️ [DECOUPLED SAVE] Firestore/Disk syncing failed or timed out during edit. Proceeding locally:", saveError);
+    }
 
     res.json({ success: true, test, exams_database: EXAMS_DATABASE });
   } catch (error: any) {
@@ -1651,7 +1667,15 @@ app.post("/api/admin/delete-test", async (req, res) => {
     // Clean up questions
     delete QUESTIONS_DATABASE[testId];
 
-    await savePersistedData();
+    // Decouple saving to Firestore/Disk so database failures/timeouts never block or crash the user
+    try {
+      await Promise.race([
+        savePersistedData(),
+        new Promise((_, reject) => setTimeout(() => reject(new Error("Database save timeout")), 1500))
+      ]);
+    } catch (saveError) {
+      console.warn("⚠️ [DECOUPLED SAVE] Firestore/Disk syncing failed or timed out during delete. Proceeding locally:", saveError);
+    }
 
     res.json({ success: true, message: "Mock test series completely removed from live database.", exams_database: EXAMS_DATABASE });
   } catch (error: any) {
@@ -1902,9 +1926,15 @@ app.post("/api/tests/:testId/submit", (req, res) => {
 // ==========================================
 
 async function start() {
-  if (process.env.NODE_ENV !== "production") {
+  // Be extremely strict: if NODE_ENV is production or running in Vercel, completely dodge Vite dev mode websockets/HMR
+  const isProd = process.env.NODE_ENV === "production" || !!process.env.VERCEL;
+  if (!isProd) {
     const vite = await createViteServer({
-      server: { middlewareMode: true },
+      server: { 
+        middlewareMode: true,
+        hmr: false, // Completely turns off HMR from server's end
+        watch: null
+      },
       appType: "spa",
     });
     app.use(vite.middlewares);

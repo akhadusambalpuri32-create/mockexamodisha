@@ -1,15 +1,20 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    
+    // 1. Users collection: Ensure authenticated users can only access their own user profile data
     match /users/{uid} {
-      allow read, write: if request.auth != null;
+      allow read, write: if request.auth != null && request.auth.uid == uid;
     }
 
-    match /test/{docId} {
-      allow read: if true;
-    }
-
+    // 2. Admin configurations: Used by server/clients to load exams structures and question banks.
+    // Must allow public read/write since server acts as an unauthenticated Client SDK delegate.
     match /admin_config/{docId} {
+      allow read, write: if true;
+    }
+
+    // 3. Connection and secondary testing endpoints
+    match /test/{docId} {
       allow read, write: if true;
     }
   }

@@ -24,35 +24,57 @@ import {
 import firebaseConfigDefault from "../firebase-applet-config.json";
 
 // We check local storage for custom overridden credentials (allows Vercel users to change project dynamically)
+// ============================================================================
+//               PROD/VERCEL FIREBASE CONFIGURATION BLOCK
+// ============================================================================
+// PASTE YOUR REAL FIREBASE API KEYS AND SPECIFICATIONS BELOW TO DEPLOY TO VERCEL.
+// If you leave these fields empty, the app will fall back to Vite environment 
+// variables, or the defaults from firebase-applet-config.json.
+// ============================================================================
+const VERCEL_FIREBASE_KEYS = {
+  apiKey: "",             // e.g. "AIzaSy..."
+  authDomain: "",         // e.g. "your-app.firebaseapp.com"
+  projectId: "",          // e.g. "your-app-id"
+  storageBucket: "",      // e.g. "your-app.firebasestorage.app"
+  messagingSenderId: "",  // e.g. "1234567890"
+  appId: "",              // e.g. "1:123456:web:abcd"
+  measurementId: ""       // Optional
+};
+
 let firebaseConfig: any = { ...firebaseConfigDefault };
 
-const customConfigStr = typeof window !== "undefined" ? window.localStorage.getItem("kalinga_user_firebase_config") : null;
-if (customConfigStr) {
-  try {
-    const customConfig = JSON.parse(customConfigStr);
-    if (customConfig && typeof customConfig === "object" && customConfig.apiKey) {
-      console.log("🔥 Using custom Firebase configuration from Local Storage:", customConfig.projectId);
-      firebaseConfig = { ...firebaseConfig, ...customConfig };
-    }
-  } catch (e) {
-    console.error("Failed to parse custom Firebase config from local storage:", e);
-  }
+if (VERCEL_FIREBASE_KEYS.apiKey) {
+  console.log("🔥 Using explicit copy-paste credentials from VERCEL_FIREBASE_KEYS");
+  firebaseConfig = { ...firebaseConfig, ...VERCEL_FIREBASE_KEYS };
 } else {
-  // Check Vite client-side environment variables as alternative fallback
-  const metaEnv = (import.meta as any).env || {};
-  const envApiKey = metaEnv.VITE_FIREBASE_API_KEY;
-  if (envApiKey) {
-    console.log("🔥 Using custom Firebase configuration from Environment Variables:", metaEnv.VITE_FIREBASE_PROJECT_ID);
-    firebaseConfig = {
-      apiKey: envApiKey,
-      authDomain: metaEnv.VITE_FIREBASE_AUTH_DOMAIN || `${metaEnv.VITE_FIREBASE_PROJECT_ID}.firebaseapp.com`,
-      projectId: metaEnv.VITE_FIREBASE_PROJECT_ID,
-      storageBucket: metaEnv.VITE_FIREBASE_STORAGE_BUCKET || `${metaEnv.VITE_FIREBASE_PROJECT_ID}.firebasestorage.app`,
-      messagingSenderId: metaEnv.VITE_FIREBASE_MESSAGING_SENDER_ID,
-      appId: metaEnv.VITE_FIREBASE_APP_ID,
-      measurementId: metaEnv.VITE_FIREBASE_MEASUREMENT_ID || "",
-      firestoreDatabaseId: metaEnv.VITE_FIREBASE_DATABASE_ID || metaEnv.VITE_FIREBASE_FIRESTORE_DATABASE_ID || firebaseConfigDefault.firestoreDatabaseId
-    };
+  const customConfigStr = typeof window !== "undefined" ? window.localStorage.getItem("kalinga_user_firebase_config") : null;
+  if (customConfigStr) {
+    try {
+      const customConfig = JSON.parse(customConfigStr);
+      if (customConfig && typeof customConfig === "object" && customConfig.apiKey) {
+        console.log("🔥 Using custom Firebase configuration from Local Storage:", customConfig.projectId);
+        firebaseConfig = { ...firebaseConfig, ...customConfig };
+      }
+    } catch (e) {
+      console.error("Failed to parse custom Firebase config from local storage:", e);
+    }
+  } else {
+    // Check Vite client-side environment variables as alternative fallback
+    const metaEnv = (import.meta as any).env || {};
+    const envApiKey = metaEnv.VITE_FIREBASE_API_KEY;
+    if (envApiKey) {
+      console.log("🔥 Using custom Firebase configuration from Environment Variables:", metaEnv.VITE_FIREBASE_PROJECT_ID);
+      firebaseConfig = {
+        apiKey: envApiKey,
+        authDomain: metaEnv.VITE_FIREBASE_AUTH_DOMAIN || `${metaEnv.VITE_FIREBASE_PROJECT_ID}.firebaseapp.com`,
+        projectId: metaEnv.VITE_FIREBASE_PROJECT_ID,
+        storageBucket: metaEnv.VITE_FIREBASE_STORAGE_BUCKET || `${metaEnv.VITE_FIREBASE_PROJECT_ID}.firebasestorage.app`,
+        messagingSenderId: metaEnv.VITE_FIREBASE_MESSAGING_SENDER_ID,
+        appId: metaEnv.VITE_FIREBASE_APP_ID,
+        measurementId: metaEnv.VITE_FIREBASE_MEASUREMENT_ID || "",
+        firestoreDatabaseId: metaEnv.VITE_FIREBASE_DATABASE_ID || metaEnv.VITE_FIREBASE_FIRESTORE_DATABASE_ID || firebaseConfigDefault.firestoreDatabaseId
+      };
+    }
   }
 }
 

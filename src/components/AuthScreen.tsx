@@ -475,31 +475,7 @@ export default function AuthScreen({ onLoginSuccess, onExit }: AuthScreenProps) 
           <p className="text-xs text-slate-500 mt-1.5">Prepare with standard mock syllabus modules & join board / teaching leagues</p>
         </div>
 
-        {/* Quick Demo Credentials Panel for testing */}
-        <div className="bg-amber-100/40 rounded-2xl p-4 border border-amber-200/50 mb-6 text-center">
-          <div className="flex items-center justify-center gap-1.5 mb-2">
-            <Sparkles className="h-3.5 w-3.5 text-orange-500 fill-orange-400" />
-            <span className="text-[10px] text-amber-900 font-extrabold uppercase tracking-wide">
-              Quick review profile triggers
-            </span>
-          </div>
-          <div className="flex flex-col sm:flex-row gap-2 justify-center">
-            <button
-              onClick={() => triggerQuickDemo("Subhashree Patnaik", "bse-10", "Khordha")}
-              className="px-3.5 py-2 bg-white border border-amber-200 text-slate-800 font-extrabold text-[11px] rounded-xl hover:bg-amber-50 transition-all cursor-pointer shadow-xs whitespace-nowrap"
-            >
-              🎓 BSE Board Candidate
-            </button>
-            <button
-              onClick={() => triggerQuickDemo("Ashok Samal", "osssc-ri", "Sambalpur")}
-              className="px-3.5 py-2 bg-white border border-amber-200 text-slate-800 font-extrabold text-[11px] rounded-xl hover:bg-amber-50 transition-all cursor-pointer shadow-xs whitespace-nowrap"
-            >
-              💼 OPSC/RI Competitive
-            </button>
-          </div>
-        </div>
-
-        {/* Switch Login vs Sign Up vs Phone tabs */}
+        {/* Switch Login vs Sign Up tabs */}
         <div className="bg-slate-100 p-1 rounded-xl flex gap-1 mb-6 text-[10.5px] font-bold overflow-x-auto">
           <button
             onClick={() => {
@@ -507,7 +483,7 @@ export default function AuthScreen({ onLoginSuccess, onExit }: AuthScreenProps) 
               setErrorMessage(null);
               setInfoMessage(null);
             }}
-            className={`flex-1 min-w-[65px] py-1.5 rounded-lg transition-all ${
+            className={`flex-1 min-w-[120px] py-2 rounded-lg transition-all ${
               screen === "signin" ? "bg-white text-blue-950 shadow-sm font-extrabold" : "text-slate-500 hover:text-slate-850"
             }`}
           >
@@ -519,36 +495,11 @@ export default function AuthScreen({ onLoginSuccess, onExit }: AuthScreenProps) 
               setErrorMessage(null);
               setInfoMessage(null);
             }}
-            className={`flex-1 min-w-[70px] py-1.5 rounded-lg transition-all ${
+            className={`flex-1 min-w-[120px] py-2 rounded-lg transition-all ${
               screen === "signup" ? "bg-white text-blue-950 shadow-sm font-extrabold" : "text-slate-500 hover:text-slate-850"
             }`}
           >
             Sign Up
-          </button>
-          <button
-            onClick={() => {
-              setScreen("phone");
-              setErrorMessage(null);
-              setInfoMessage(null);
-              setOtpSent(false);
-            }}
-            className={`flex-1 min-w-[70px] py-1.5 rounded-lg transition-all ${
-              screen === "phone" ? "bg-white text-blue-950 shadow-sm font-extrabold" : "text-slate-500 hover:text-slate-850"
-            }`}
-          >
-            SMS OTP
-          </button>
-          <button
-            onClick={() => {
-              setScreen("local");
-              setErrorMessage(null);
-              setInfoMessage(null);
-            }}
-            className={`flex-1 min-w-[95px] py-1.5 rounded-lg transition-all ${
-              screen === "local" ? "bg-amber-500 text-white shadow-sm font-extrabold" : "text-amber-700 hover:bg-amber-100"
-            }`}
-          >
-            🌟 Local Login
           </button>
         </div>
 
@@ -630,26 +581,6 @@ export default function AuthScreen({ onLoginSuccess, onExit }: AuthScreenProps) 
                     </button>
                   </div>
                 </div>
-
-                <div className="text-center font-bold text-slate-400 text-[10px] my-1 uppercase">— OR USE FALLBACK MODES —</div>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setScreen("local");
-                    setErrorMessage(null);
-                  }}
-                  className="w-full px-3 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl font-bold text-xs transition-all cursor-pointer shadow-sm text-center block"
-                >
-                  🌟 Switch to Secure Local/Offline Profile Mode (Works Anywhere)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => triggerQuickDemo("Subhashree Patnaik (Local)", "bse-10", "Khordha")}
-                  className="w-full px-3 py-2 bg-zinc-850 hover:bg-black text-white rounded-xl font-bold text-xs transition-all cursor-pointer shadow-sm text-center block"
-                >
-                  🚀 Quick Guest Access: Try Demo Student Account
-                </button>
 
                 <div className="pt-1.5">
                   <button

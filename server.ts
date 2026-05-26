@@ -6,6 +6,43 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { initializeApp } from "firebase/app";
 import { initializeFirestore, doc, getDoc, setDoc } from "firebase/firestore";
 
+// Intercept console functions to suppress benign, noisy background Firestore stream disconnections in server environment
+const originalConsoleError = console.error;
+const originalConsoleWarn = console.warn;
+
+const isBenignFirestoreMessage = (...args: any[]): boolean => {
+  const msg = args.map(arg => {
+    try {
+      return typeof arg === "object" ? JSON.stringify(arg) : String(arg);
+    } catch (_) {
+      return String(arg);
+    }
+  }).join(" ");
+
+  return (
+    msg.includes("@firebase/firestore") ||
+    msg.includes("GrpcConnection") ||
+    msg.includes("Disconnecting idle stream") ||
+    msg.includes("Timed out waiting for new targets") ||
+    msg.includes("CANCELLED") ||
+    msg.includes("idle stream")
+  );
+};
+
+console.error = function (...args: any[]) {
+  if (isBenignFirestoreMessage(...args)) {
+    return;
+  }
+  originalConsoleError.apply(console, args);
+};
+
+console.warn = function (...args: any[]) {
+  if (isBenignFirestoreMessage(...args)) {
+    return;
+  }
+  originalConsoleWarn.apply(console, args);
+};
+
 // Register custom handlers at startup to silence benign, noisy background Firestore stream disconnections in server environment
 process.on("unhandledRejection", (reason: any) => {
   const reasonStr = String(reason?.stack || reason?.message || reason || "");
@@ -21,7 +58,7 @@ process.on("unhandledRejection", (reason: any) => {
     // Safely swallow benign Firestore connection status event logs
     return;
   }
-  console.error("❌ Unhandled Rejection on Server:", reason);
+  originalConsoleError("❌ Unhandled Rejection on Server:", reason);
 });
 
 process.on("uncaughtException", (error: any) => {
@@ -38,7 +75,7 @@ process.on("uncaughtException", (error: any) => {
     // Safely swallow benign Firestore connection process warnings
     return;
   }
-  console.error("❌ Uncaught Exception on Server:", error);
+  originalConsoleError("❌ Uncaught Exception on Server:", error);
   process.exit(1);
 });
 
@@ -69,8 +106,8 @@ app.use(express.urlencoded({ limit: "50mb", extended: true }));
 let aiClient: GoogleGenAI | null = null;
 function getAi(): GoogleGenAI | null {
   if (!aiClient) {
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (apiKey && apiKey !== "MY_GEMINI_API_KEY") {
+    const apiKey = process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY;
+    if (apiKey && apiKey !== "MY_GEMINI_API_KEY" && apiKey !== "PLACEHOLDER") {
       aiClient = new GoogleGenAI({
         apiKey: apiKey,
         httpOptions: {
@@ -80,7 +117,7 @@ function getAi(): GoogleGenAI | null {
         },
       });
     } else {
-      console.warn("GEMINI_API_KEY is not set or using placeholder. Running in simulated AI mode.");
+      console.warn("GEMINI_API_KEY / env keys are not set or using placeholder.");
     }
   }
   return aiClient;
@@ -1325,9 +1362,8 @@ app.post("/api/admin/parse-test", async (req, res) => {
     let mode = "AI";
 
     if (!ai) {
-      console.warn("GEMINI_API_KEY placeholder or unassigned. Falling back manually to regex-based local text parser.");
-      parsedQuestions = parseWithRegexFallback(rawText);
-      mode = "Regex Sim Parser";
+      console.warn("API Authorization fail: No Gemini API Key configured in Environment Variables.");
+      return res.status(400).json({ error: "Missing API Key" });
     } else {
       try {
         const systemInstruction = 

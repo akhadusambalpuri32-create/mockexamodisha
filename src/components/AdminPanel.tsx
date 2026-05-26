@@ -4,6 +4,193 @@ import {
 } from "lucide-react";
 import { auth, signInWithEmailAndPassword, createUserWithEmailAndPassword } from "../firebase";
 
+const STATIC_EXAMS = {
+  board: [
+    { 
+      id: "cbse-board", 
+      name: "CBSE - Class 10th National Board", 
+      short: "CBSE Board", 
+      category: "board", 
+      subCategory: "cbse", 
+      tests: [
+        { id: "cbse-10-sci", title: "CBSE Class 10th Science Master Test Set", isFree: true },
+        { id: "cbse-10-math", title: "CBSE Class 10th Mathematics Test Set", isFree: true }
+      ] 
+    },
+    { 
+      id: "bse-board", 
+      name: "BSE - Odisha Matric Board Exam", 
+      short: "BSE Board", 
+      category: "board", 
+      subCategory: "bse", 
+      tests: [
+        { id: "bse-10-mth", title: "BSE Class 10th (Matric) Advanced Math", isFree: true }
+      ] 
+    },
+    { 
+      id: "chse-board", 
+      name: "CHSE - Odisha Higher Secondary Board", 
+      short: "CHSE Board", 
+      category: "board", 
+      subCategory: "chse", 
+      tests: [
+        { id: "chse-12-phy", title: "CHSE Class 12th Physics (Electrostatics + Optics)", isFree: true },
+        { id: "chse-12-mth", title: "CHSE Class 12th Calculus & Vectors", isFree: true }
+      ] 
+    }
+  ],
+  teaching: [
+    { 
+      id: "otet", 
+      name: "OTET - Odisha Teacher Eligibility Test", 
+      short: "OTET", 
+      category: "teaching", 
+      subCategory: "otet", 
+      durationMins: 150,
+      tests: [
+        { id: "otet-p1-arts", title: "OTET Paper-I (Arts Group) Child Development", isFree: true },
+        { id: "otet-p1-sci", title: "OTET Paper-I (Science Group) Mathematics & EVS", isFree: true }
+      ] 
+    },
+    { 
+      id: "osstet", 
+      name: "OSSTET - Secondary School Teacher Eligibility Test", 
+      short: "OSSTET", 
+      category: "teaching", 
+      subCategory: "osstet", 
+      durationMins: 150,
+      tests: [
+        { id: "osstet-tgt-arts", title: "OSSTET TGT ARTS - English & Odia Pedagogy", isFree: true }
+      ] 
+    },
+    { 
+      id: "ossc-tgt", 
+      name: "OSSC TGT - Trained Graduate Teacher recruitment", 
+      short: "OSSC TGT", 
+      category: "teaching", 
+      subCategory: "ossc_tgt", 
+      durationMins: 150,
+      tests: [
+        { id: "ossc-tgt-arts", title: "OSSC TGT ARTS Specialist Test", isFree: true }
+      ] 
+    },
+    { 
+      id: "ssb-tgt", 
+      name: "SSB TGT - State Selection Board Teacher recruitment", 
+      short: "SSB TGT", 
+      category: "teaching", 
+      subCategory: "ssb_tgt", 
+      durationMins: 150,
+      tests: [
+        { id: "ssb-tgt-arts", title: "SSB TGT ARTS - History, Civics & Land laws", isFree: true }
+      ] 
+    },
+    { 
+      id: "jt", 
+      name: "JT - Junior Teacher Primary & Upper Primary", 
+      short: "JT", 
+      category: "teaching", 
+      subCategory: "jt", 
+      durationMins: 120,
+      tests: [
+        { id: "jt-p1-arts", title: "JT Paper-I Arts Section practice", isFree: true }
+      ] 
+    },
+    { 
+      id: "pet", 
+      name: "P.ET - Physical Education Teacher specialization", 
+      short: "P.ET", 
+      category: "teaching", 
+      subCategory: "pet", 
+      durationMins: 90,
+      tests: [
+        { id: "pet-general", title: "P.ET - General Physical Education, Anatomy & Rules of Sports", isFree: true }
+      ] 
+    },
+    { 
+      id: "bed-entrance", 
+      name: "B.Ed. Entrance Exam - State quota seats", 
+      short: "B.Ed", 
+      category: "teaching", 
+      subCategory: "bed_entrance", 
+      durationMins: 120,
+      tests: [
+        { id: "bed-arts", title: "B.ED Entrance Exam - Arts Section Mock", isFree: true }
+      ] 
+    },
+    { 
+      id: "deled-entrance", 
+      name: "D.El.Ed / CT Entrance - Primary teacher certification", 
+      short: "D.El.Ed", 
+      category: "teaching", 
+      subCategory: "deled_entrance", 
+      durationMins: 90,
+      tests: [
+        { id: "ct-integrated", title: "CT/DELED Entrance General Ability integrated test", isFree: true }
+      ] 
+    }
+  ],
+  competitive: [
+    { 
+      id: "opsc-ocs", 
+      name: "OPSC - Odisha Civil Services (Pre)", 
+      short: "OPSC OCS", 
+      category: "competitive", 
+      subCategory: "opsc_ocs", 
+      durationMins: 120,
+      tests: [
+        { id: "ocs-pre-1", title: "OCS General Studies Paper-I (Mock 1)", isFree: true }
+      ] 
+    },
+    { 
+      id: "osssc-ri", 
+      name: "OSSSC - Revenue Inspector & AMIN", 
+      short: "OSSSC RI", 
+      category: "competitive", 
+      subCategory: "osssc_ri", 
+      durationMins: 120,
+      tests: [
+        { id: "osssc-ri-gs", title: "OSSSC RI General Studies Practical Mock 1", isFree: true }
+      ] 
+    },
+    { 
+      id: "ossc-cgl", 
+      name: "OSSC - Combined Graduate Level Pre", 
+      short: "OSSC CGL", 
+      category: "competitive", 
+      subCategory: "ossc_cgl", 
+      durationMins: 150,
+      tests: [
+        { id: "ossc-cgl-pre", title: "OSSC CGL Mathematics & Logical Reasoning Set", isFree: true }
+      ] 
+    },
+    { 
+      id: "police-si", 
+      name: "Odisha Police SI - Sub Inspector recruitment", 
+      short: "Odisha Police SI", 
+      category: "competitive", 
+      subCategory: "police_si", 
+      durationMins: 150,
+      tests: [
+        { id: "police-si-gs", title: "Odisha Police SI General Studies Paper-I Practice", isFree: true }
+      ] 
+    }
+  ],
+  others: [
+    { 
+      id: "computer-skill", 
+      name: "OSSSC/OPSC Computer Practical Skill test", 
+      short: "Computer Skill", 
+      category: "others", 
+      subCategory: "computer_skill", 
+      durationMins: 60,
+      tests: [
+        { id: "skill-win-word", title: "OSSSC Computer Practical Mock (Windows & MS Word)", isFree: true }
+      ] 
+    }
+  ]
+};
+
 interface AdminPanelProps {
   exams: {
     board: any[];
@@ -16,6 +203,37 @@ interface AdminPanelProps {
 }
 
 export default function AdminPanel({ exams, onReloadExams, userProfile }: AdminPanelProps) {
+  // Merge static default list with props.exams to guarantee rendering in production
+  const safeExams = React.useMemo(() => {
+    const merged = {
+      board: [...(STATIC_EXAMS.board || [])],
+      teaching: [...(STATIC_EXAMS.teaching || [])],
+      competitive: [...(STATIC_EXAMS.competitive || [])],
+      others: [...(STATIC_EXAMS.others || [])]
+    };
+
+    if (exams) {
+      const catKeys = ["board", "teaching", "competitive", "others"] as const;
+      catKeys.forEach(cat => {
+        const propExams = exams[cat] || [];
+        propExams.forEach((pe: any) => {
+          const existingIdx = merged[cat].findIndex(e => e.id === pe.id);
+          if (existingIdx >= 0) {
+            merged[cat][existingIdx] = {
+              ...merged[cat][existingIdx],
+              ...pe,
+              tests: pe.tests && pe.tests.length > 0 ? pe.tests : merged[cat][existingIdx].tests
+            };
+          } else {
+            merged[cat].push(pe);
+          }
+        });
+      });
+    }
+
+    return merged;
+  }, [exams]);
+
   // Authentication states
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(() => {
     return localStorage.getItem("orisha_admin_authenticated") === "true";
@@ -188,21 +406,21 @@ export default function AdminPanel({ exams, onReloadExams, userProfile }: AdminP
   // Set default selectedExamId when examCategory changes
   useEffect(() => {
     const list = examCategory === "others"
-      ? [...(exams.competitive || []), ...(exams.others || [])]
-      : (exams[examCategory] || []);
+      ? [...(safeExams.competitive || []), ...(safeExams.others || [])]
+      : (safeExams[examCategory] || []);
     if (list.length > 0) {
       setSelectedExamId(list[0].id);
     } else {
       setSelectedExamId("");
     }
-  }, [examCategory, exams]);
+  }, [examCategory, safeExams]);
 
   // Set default test values based on the selected exam (like negative marking = 0 for OTET/OSSTET)
   useEffect(() => {
     if (!selectedExamId) return;
     const list = examCategory === "others"
-      ? [...(exams.competitive || []), ...(exams.others || [])]
-      : (exams[examCategory] || []);
+      ? [...(safeExams.competitive || []), ...(safeExams.others || [])]
+      : (safeExams[examCategory] || []);
     const found = list.find(e => e.id === selectedExamId);
     if (found) {
       // BSE / CHSE / OTET / OSSTET have no negative marking, adjust dynamically!
@@ -212,7 +430,7 @@ export default function AdminPanel({ exams, onReloadExams, userProfile }: AdminP
       setDurationMins(found.durationMins || 120);
       setNewTestTitle(`Parsed ${found.short || found.id} Master Mock`);
     }
-  }, [selectedExamId, examCategory, exams]);
+  }, [selectedExamId, examCategory, safeExams]);
 
   // File loading reader helper
   const handleFileContent = (file: File) => {
@@ -353,8 +571,8 @@ export default function AdminPanel({ exams, onReloadExams, userProfile }: AdminP
 
   // Populate dynamic tests list for a selected exam
   const currentExamList = examCategory === "others"
-    ? [...(exams.competitive || []), ...(exams.others || [])]
-    : (exams[examCategory] || []);
+    ? [...(safeExams.competitive || []), ...(safeExams.others || [])]
+    : (safeExams[examCategory] || []);
   const currentExamObj = currentExamList.find(e => e.id === selectedExamId);
   const availableTests = currentExamObj?.tests || [];
 

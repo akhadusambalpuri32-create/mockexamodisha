@@ -203,6 +203,14 @@ export default function AIDoubtSolver({ userExamTarget }: AIDoubtSolverProps) {
                 onChange={(e) => setTargetExam(e.target.value)}
                 className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold outline-none focus:border-blue-500"
               >
+                <option value="otet">Odisha Teacher Eligibility (OTET)</option>
+                <option value="osstet">Sec. School Teacher Eligibility (OSSTET)</option>
+                <option value="ossc-tgt">OSSC TGT Trained Graduate Teacher</option>
+                <option value="ssb-tgt">SSB TGT recruitment</option>
+                <option value="jt">Junior Teacher Primary (JT)</option>
+                <option value="pet">Physical Education (P.ET)</option>
+                <option value="bed-entrance">B.Ed. Entrance Exam</option>
+                <option value="deled-entrance">D.El.Ed / CT Entrance</option>
                 <option value="opsc-ocs">OPSC Civil Services</option>
                 <option value="osssc-ri">OSSSC Revenue Inspector</option>
                 <option value="ossc-cgl">OSSC Combined Graduate</option>

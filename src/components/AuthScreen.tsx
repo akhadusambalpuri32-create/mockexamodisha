@@ -763,10 +763,17 @@ export default function AuthScreen({ onLoginSuccess, onExit }: AuthScreenProps) 
                     onChange={(e) => setExamTarget(e.target.value)}
                     className="pl-10 pr-4 py-2.5 w-full text-xs border border-slate-250 bg-slate-50/40 rounded-xl outline-none focus:bg-white focus:ring-2 focus:ring-orange-500/10 transition-all text-slate-705 font-bold appearance-none"
                   >
-                    <option value="opsc-ocs">OPSC Civil Services</option>
-                    <option value="bse-10">BSE Class 10 Board</option>
-                    <option value="otet">Odisha Teacher (OTET)</option>
-                    <option value="osssc-ri">OSSSC Revenue Inspector</option>
+                    <option value="otet">👨‍🏫 Odisha Teacher Eligibility Test (OTET)</option>
+                    <option value="osstet">🏫 Secondary School Teacher Eligibility Test (OSSTET)</option>
+                    <option value="ossc-tgt">🎓 OSSC TGT (Trained Graduate Teacher)</option>
+                    <option value="ssb-tgt">🏛️ SSB TGT (State Selection Board Teacher)</option>
+                    <option value="jt">✏️ Junior Teacher (JT) Primary / Upper Primary</option>
+                    <option value="pet">⚽ Physical Education Teacher (P.ET)</option>
+                    <option value="bed-entrance">📚 B.Ed. Entrance Exam</option>
+                    <option value="deled-entrance">✒️ D.El.Ed / CT Entrance</option>
+                    <option value="opsc-ocs">💼 OPSC Civil Services (Pre)</option>
+                    <option value="osssc-ri">📊 OSSSC Revenue Inspector (RI)</option>
+                    <option value="bse-10">🏫 BSE Class 10 Board</option>
                   </select>
                 </div>
               </div>
@@ -872,9 +879,17 @@ export default function AuthScreen({ onLoginSuccess, onExit }: AuthScreenProps) 
                       onChange={(e) => setExamTarget(e.target.value)}
                       className="w-full text-xs p-2.5 bg-slate-50 border border-slate-250 rounded-xl font-bold text-slate-705 outline-none"
                     >
+                      <option value="otet">Odisha Teacher (OTET)</option>
+                      <option value="osstet">Sec. School Teacher (OSSTET)</option>
+                      <option value="ossc-tgt">OSSC TGT (Arts/CBZ/PCM)</option>
+                      <option value="ssb-tgt">SSB TGT (Arts/Science)</option>
+                      <option value="jt">Junior Teacher (JT)</option>
+                      <option value="pet">Physical Education (P.ET)</option>
+                      <option value="bed-entrance">B.Ed. Entrance Exam</option>
+                      <option value="deled-entrance">D.El.Ed / CT Entrance</option>
                       <option value="opsc-ocs">OPSC Civil Services</option>
-                      <option value="bse-10">BSE Class 10 Board</option>
                       <option value="osssc-ri">OSSSC Revenue Inspector</option>
+                      <option value="bse-10">BSE Class 10 Board</option>
                     </select>
                   </div>
                   <div>
@@ -978,10 +993,17 @@ export default function AuthScreen({ onLoginSuccess, onExit }: AuthScreenProps) 
                   onChange={(e) => setExamTarget(e.target.value)}
                   className="w-full text-xs p-2.5 bg-white border border-slate-250 rounded-xl font-bold text-slate-705 outline-none"
                 >
-                  <option value="opsc-ocs">OPSC Civil Services</option>
-                  <option value="bse-10">BSE Class 10 Board</option>
-                  <option value="osssc-ri">OSSSC Revenue Inspector</option>
                   <option value="otet">Odisha Teacher (OTET)</option>
+                  <option value="osstet">Sec. School Teacher (OSSTET)</option>
+                  <option value="ossc-tgt">OSSC TGT (Arts/CBZ/PCM)</option>
+                  <option value="ssb-tgt">SSB TGT (Arts/Science)</option>
+                  <option value="jt">Junior Teacher (JT)</option>
+                  <option value="pet">Physical Education (P.ET)</option>
+                  <option value="bed-entrance">B.Ed. Entrance Exam</option>
+                  <option value="deled-entrance">D.El.Ed / CT Entrance</option>
+                  <option value="opsc-ocs">OPSC Civil Services</option>
+                  <option value="osssc-ri">OSSSC Revenue Inspector</option>
+                  <option value="bse-10">BSE Class 10 Board</option>
                 </select>
               </div>
               

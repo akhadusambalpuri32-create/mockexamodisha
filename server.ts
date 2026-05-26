@@ -1344,6 +1344,7 @@ app.post("/api/admin/parse-test", async (req, res) => {
 
     const {
       rawText,
+      questions,    // Accept pre-parsed questions from client
       examCategory, // board | teaching | competitive | others
       examId,       // e.g. cbse-board
       testId,       // existing testId or "new"
@@ -1353,25 +1354,29 @@ app.post("/api/admin/parse-test", async (req, res) => {
       marksPerQuestion
     } = req.body;
 
-    if (!rawText || !rawText.trim()) {
-      return res.status(400).json({ error: "Missing mock test sheet raw text content." });
-    }
-
-    const ai = getAi();
     let parsedQuestions: any[] = [];
     let mode = "AI";
 
-    if (!ai) {
-      console.warn("API Authorization fail: No Gemini API Key configured in Environment Variables.");
-      return res.status(400).json({ error: "Missing API Key" });
+    if (questions && Array.isArray(questions)) {
+      parsedQuestions = questions;
+      mode = "Client-Sourced Sync";
     } else {
-      try {
-        const systemInstruction = 
-          "You are an elite, highly precise educational content converter for Odisha state examinations (OPSC, OSSSC, OSSC, BSE, CHSE). " +
-          "You convert raw typed exam questionnaires, study sheets, or copy-pasted Word documents containing MCQs into perfectly structured JSON format. " +
-          "Strictly adhere to the provided schema.";
+      if (!rawText || !rawText.trim()) {
+        return res.status(400).json({ error: "Missing mock test sheet raw text content." });
+      }
 
-        const promptText = `Please parse the following copied MCQ test sheets into JSON questions conforming to the requested schema. 
+      const ai = getAi();
+      if (!ai) {
+        console.warn("API Authorization fail: No Gemini API Key configured in Environment Variables.");
+        return res.status(400).json({ error: "Missing API Key" });
+      } else {
+        try {
+          const systemInstruction = 
+            "You are an elite, highly precise educational content converter for Odisha state examinations (OPSC, OSSSC, OSSC, BSE, CHSE). " +
+            "You convert raw typed exam questionnaires, study sheets, or copy-pasted Word documents containing MCQs into perfectly structured JSON format. " +
+            "Strictly adhere to the provided schema.";
+
+          const promptText = `Please parse the following copied MCQ test sheets into JSON questions conforming to the requested schema. 
 Each question MUST have exactly 4 choices (options). 
 Extract the 0-based key correctIndex where A=0, B=1, C=2, D=3.
 If there are minor explanations in the text, clean them up and use them. Otherwise, write a highly descriptive explanation yourself.
@@ -1382,52 +1387,52 @@ Raw text document content:
 ${rawText}
 ---`;
 
-        // Wrap with standard 18-second timeout to prevent container timeouts
-        const generatePromise = ai.models.generateContent({
-          model: "gemini-3.5-flash",
-          contents: promptText,
-          config: {
-            systemInstruction,
-            responseMimeType: "application/json",
-            responseSchema: {
-              type: Type.OBJECT,
-              properties: {
-                questions: {
-                  type: Type.ARRAY,
-                  items: {
-                    type: Type.OBJECT,
-                    properties: {
-                      question: { type: Type.STRING },
-                      options: {
-                        type: Type.ARRAY,
-                        items: { type: Type.STRING }
+          // Wrap with standard 18-second timeout to prevent container timeouts
+          const generatePromise = ai.models.generateContent({
+            model: "gemini-3.5-flash",
+            contents: promptText,
+            config: {
+              systemInstruction,
+              responseMimeType: "application/json",
+              responseSchema: {
+                type: Type.OBJECT,
+                properties: {
+                  questions: {
+                    type: Type.ARRAY,
+                    items: {
+                      type: Type.OBJECT,
+                      properties: {
+                        question: { type: Type.STRING },
+                        options: {
+                          type: Type.ARRAY,
+                          items: { type: Type.STRING }
+                        },
+                        correctIndex: { type: Type.INTEGER, description: "0-based correct choice (A=0, B=1, C=2, D=3)" },
+                        explanation: { type: Type.STRING },
+                        subject: { type: Type.STRING },
+                        topic: { type: Type.STRING }
                       },
-                      correctIndex: { type: Type.INTEGER, description: "0-based correct choice (A=0, B=1, C=2, D=3)" },
-                      explanation: { type: Type.STRING },
-                      subject: { type: Type.STRING },
-                      topic: { type: Type.STRING }
-                    },
-                    required: ["question", "options", "correctIndex", "explanation"]
+                      required: ["question", "options", "correctIndex", "explanation"]
+                    }
                   }
-                }
-              },
-              required: ["questions"]
+                },
+                required: ["questions"]
+              }
             }
+          });
+
+          const response = await withTimeout(generatePromise, 18000);
+          const parsedJson = JSON.parse(response.text.trim());
+          if (parsedJson && Array.isArray(parsedJson.questions)) {
+            parsedQuestions = parsedJson.questions;
+          } else {
+            throw new Error("Returned JSON did not match expected 'questions' list schema.");
           }
-        });
-
-        const response = await withTimeout(generatePromise, 18000);
-
-        const parsedJson = JSON.parse(response.text.trim());
-        if (parsedJson && Array.isArray(parsedJson.questions)) {
-          parsedQuestions = parsedJson.questions;
-        } else {
-          throw new Error("Returned JSON did not match expected 'questions' list schema.");
+        } catch (err: any) {
+          console.warn("Gemini Parsing error or timeout. Engaging intelligent Regex parser to prevent application disruption:", err);
+          parsedQuestions = parseWithRegexFallback(rawText);
+          mode = "Regex Recovery Parser";
         }
-      } catch (err: any) {
-        console.warn("Gemini Parsing error or timeout. Engaging intelligent Regex parser to prevent application disruption:", err);
-        parsedQuestions = parseWithRegexFallback(rawText);
-        mode = "Regex Recovery Parser";
       }
     }
 

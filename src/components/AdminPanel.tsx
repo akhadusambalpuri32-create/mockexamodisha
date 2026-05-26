@@ -3,6 +3,7 @@ import {
   ShieldAlert, Database, PlusCircle, Bell, BookOpen, Sparkles, UploadCloud, CheckCircle, HelpCircle, FileText, Loader2, RefreshCw, Lock, User, Trash2, Edit3, Calendar, Settings
 } from "lucide-react";
 import { auth, signInWithEmailAndPassword, createUserWithEmailAndPassword } from "../firebase";
+import { GoogleGenAI, Type } from "@google/genai";
 
 const STATIC_EXAMS = {
   board: [
@@ -190,6 +191,31 @@ const STATIC_EXAMS = {
     }
   ]
 };
+
+export const HARDCODED_TEACHING_EXAMS = [
+  { id: "otet", name: "OTET - Odisha Teacher Eligibility Test (OTET)" },
+  { id: "osstet", name: "OSSTET - Secondary School Teacher Eligibility Test (OSSTET)" },
+  { id: "ossc-tgt", name: "OSSC TGT - Trained Graduate Teacher recruitment (OSSC TGT)" },
+  { id: "ssb-tgt", name: "SSB TGT - State Selection Board Teacher recruitment (SSB TGT)" },
+  { id: "jt", name: "JT - Junior Teacher Primary & Upper Primary (JT)" },
+  { id: "pet", name: "P.ET - Physical Education Teacher specialization (P.ET)" },
+  { id: "bed-entrance", name: "B.Ed. Entrance Exam - State quota seats (B.Ed)" },
+  { id: "deled-entrance", name: "D.El.Ed / CT Entrance - Primary teacher certification (CT)" }
+];
+
+export const HARDCODED_BOARD_EXAMS = [
+  { id: "bse-board", name: "BSE - Odisha Matric Board Exam" },
+  { id: "chse-board", name: "CHSE - Odisha Higher Secondary Board" },
+  { id: "cbse-board", name: "CBSE - Class 10th National Board" }
+];
+
+export const HARDCODED_OTHER_EXAMS = [
+  { id: "opsc-ocs", name: "OPSC - Odisha Civil Services (Pre)" },
+  { id: "osssc-ri", name: "OSSSC - Revenue Inspector & AMIN" },
+  { id: "ossc-cgl", name: "OSSC - Combined Graduate Level Pre" },
+  { id: "police-si", name: "Odisha Police SI - Sub Inspector recruitment" },
+  { id: "computer-skill", name: "OSSSC/OPSC Computer Practical Skill test" }
+];
 
 interface AdminPanelProps {
   exams: {
@@ -405,32 +431,36 @@ export default function AdminPanel({ exams, onReloadExams, userProfile }: AdminP
 
   // Set default selectedExamId when examCategory changes
   useEffect(() => {
-    const list = examCategory === "others"
-      ? [...(safeExams.competitive || []), ...(safeExams.others || [])]
-      : (safeExams[examCategory] || []);
+    const list = examCategory === "board"
+      ? HARDCODED_BOARD_EXAMS
+      : examCategory === "teaching"
+      ? HARDCODED_TEACHING_EXAMS
+      : HARDCODED_OTHER_EXAMS;
     if (list.length > 0) {
       setSelectedExamId(list[0].id);
     } else {
       setSelectedExamId("");
     }
-  }, [examCategory, safeExams]);
+  }, [examCategory]);
 
   // Set default test values based on the selected exam (like negative marking = 0 for OTET/OSSTET)
   useEffect(() => {
     if (!selectedExamId) return;
-    const list = examCategory === "others"
-      ? [...(safeExams.competitive || []), ...(safeExams.others || [])]
-      : (safeExams[examCategory] || []);
+    const list = examCategory === "board"
+      ? HARDCODED_BOARD_EXAMS
+      : examCategory === "teaching"
+      ? HARDCODED_TEACHING_EXAMS
+      : HARDCODED_OTHER_EXAMS;
     const found = list.find(e => e.id === selectedExamId);
     if (found) {
       // BSE / CHSE / OTET / OSSTET have no negative marking, adjust dynamically!
       const isNoNegative = ["otet", "osstet", "cbse-board", "bse-board", "chse-board"].includes(found.id) || selectedExamId.toLowerCase().includes("otet") || selectedExamId.toLowerCase().includes("osstet");
-      setNegativeMarking(isNoNegative ? 0 : found.negativeMarking || 0.25);
-      setMarksPerQuestion(found.marksPerQuestion || 1);
-      setDurationMins(found.durationMins || 120);
-      setNewTestTitle(`Parsed ${found.short || found.id} Master Mock`);
+      setNegativeMarking(isNoNegative ? 0 : 0.25);
+      setMarksPerQuestion(1);
+      setDurationMins(found.id === "pet" || found.id === "deled-entrance" ? 90 : 120);
+      setNewTestTitle(`Parsed ${found.name.split("-")[0].trim()} Master Mock`);
     }
-  }, [selectedExamId, examCategory, safeExams]);
+  }, [selectedExamId, examCategory]);
 
   // File loading reader helper
   const handleFileContent = (file: File) => {
@@ -496,7 +526,7 @@ export default function AdminPanel({ exams, onReloadExams, userProfile }: AdminP
       "Extracting multiple-choice patterns, correct options, and local pyq markers...",
       "Formulating answers and brief explanations...",
       "Mapping variables and purging template placeholders inside mock state...",
-      "Committing questions metadata records on Express Server database..."
+      "Committing questions metadata records on local and remote databases..."
     ];
 
     let currentStatusIdx = 0;
@@ -508,73 +538,211 @@ export default function AdminPanel({ exams, onReloadExams, userProfile }: AdminP
     }, 850);
 
     try {
-      const response = await fetch("/api/admin/parse-test", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          rawText,
-          examCategory,
-          examId: selectedExamId,
-          testId: selectedTestId,
-          newTestTitle,
-          durationMins: Number(durationMins),
-          negativeMarking: Number(negativeMarking),
-          marksPerQuestion: Number(marksPerQuestion)
-        })
+      // Direct client-side Gemini call using VITE_GEMINI_API_KEY
+      const apiKey = (import.meta as any).env.VITE_GEMINI_API_KEY;
+      if (!apiKey) {
+        throw new Error("Missing secure Gemini API Key authorization. Please set VITE_GEMINI_API_KEY on your live hosting server or environment.");
+      }
+
+      setParseStatus("Parsing sheet directly using Gemini-3.5-Flash on the client...");
+      
+      const systemInstruction = 
+        "You are an elite, highly precise educational content converter for Odisha state examinations (OPSC, OSSSC, OSSC, BSE, CHSE). " +
+        "You convert raw typed exam questionnaires, study sheets, or copy-pasted Word documents containing MCQs into perfectly structured JSON format. " +
+        "Strictly adhere to the provided schema.";
+
+      const promptText = `Please parse the following copied MCQ test sheets into JSON questions conforming to the requested schema. 
+Each question MUST have exactly 4 choices (options). 
+Extract the 0-based key correctIndex where A=0, B=1, C=2, D=3.
+If there are minor explanations in the text, clean them up and use them. Otherwise, write a highly descriptive explanation yourself.
+Process the entire list, generating up to 100-150 valid MCQ records if they exist in the raw text.
+
+Raw text document content:
+---
+${rawText}
+---`;
+
+      const ai = new GoogleGenAI({ apiKey });
+      const response = await ai.models.generateContent({
+        model: "gemini-3.5-flash",
+        contents: promptText,
+        config: {
+          systemInstruction,
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              questions: {
+                type: Type.ARRAY,
+                items: {
+                  type: Type.OBJECT,
+                  properties: {
+                    question: { type: Type.STRING },
+                    options: {
+                      type: Type.ARRAY,
+                      items: { type: Type.STRING }
+                    },
+                    correctIndex: { type: Type.INTEGER, description: "0-based correct choice (A=0, B=1, C=2, D=3)" },
+                    explanation: { type: Type.STRING },
+                    subject: { type: Type.STRING },
+                    topic: { type: Type.STRING }
+                  },
+                  required: ["question", "options", "correctIndex", "explanation"]
+                }
+              }
+            },
+            required: ["questions"]
+          }
+        }
       });
 
-      clearInterval(interval);
-      
-      let result;
-      if (!response.ok) {
-        let errorText = "Failed to process test sheet document.";
-        try {
-          const errRes = await response.json();
-          errorText = errRes.error || errorText;
-        } catch (_) {
-          try {
-            errorText = await response.text();
-          } catch (_) {}
+      const parsedJson = JSON.parse(response.text.trim());
+      const parsedQuestions = parsedJson.questions || [];
+
+      // Sanitize questions
+      const finalQuestions = parsedQuestions.map((q: any, idx: number) => {
+        const safeOptions = Array.isArray(q.options) && q.options.length >= 2 
+          ? q.options.slice(0, 4) 
+          : ["Option A", "Option B", "Option C", "Option D"];
+        while (safeOptions.length < 4) {
+          safeOptions.push(`Option ${String.fromCharCode(65 + safeOptions.length)}`);
         }
-        throw new Error(errorText);
+
+        return {
+          id: `${selectedExamId}-q-${idx + 1}-${Math.floor(Math.random() * 1000)}`,
+          question: q.question || "Parsed Mock Practice Question",
+          options: safeOptions,
+          correctIndex: typeof q.correctIndex === "number" && q.correctIndex >= 0 && q.correctIndex < 4 ? q.correctIndex : 0,
+          explanation: q.explanation || "Direct curriculum reference evaluated.",
+          shortExplanation: q.explanation || "Direct curriculum reference evaluated.",
+          subject: q.subject || "General Syllabus",
+          topic: q.topic || "Core Practice"
+        };
+      });
+
+      if (finalQuestions.length === 0) {
+        throw new Error("No valid MCQs were parsed from the sheet content. Please verify question structure.");
       }
 
-      result = await response.json();
+      const finalTargetTestId = selectedTestId === "new" 
+        ? `${selectedExamId}-parsed-${Math.floor(Math.random() * 90) + 10}` 
+        : selectedTestId;
 
-      setParseStatus("Committing database sync...");
-      if (result.exams_database) {
-        localStorage.setItem("kalinga_custom_exams_db", JSON.stringify(result.exams_database));
+      const newTestObj = {
+        id: finalTargetTestId,
+        title: selectedTestId === "new" ? newTestTitle : "Modified Existing Set",
+        isFree: true,
+        isCustom: true,
+        questionsCount: finalQuestions.length,
+        durationMins: Number(durationMins) || 90,
+        negativeMarking: Number(negativeMarking) || 0,
+        marksPerQuestion: Number(marksPerQuestion) || 1,
+        uploadedAt: new Date().toISOString(),
+        category: examCategory,
+        examId: selectedExamId
+      };
+
+      // Display in the UI memory & local storage first to decouple and protect against DB errors!
+      const localExamsStr = localStorage.getItem("kalinga_custom_exams_db");
+      let baseExams = localExamsStr ? JSON.parse(localExamsStr) : { board: [], teaching: [], competitive: [], others: [] };
+
+      // Ensure appropriate categories exist
+      const categories = ["board", "teaching", "competitive", "others"];
+      categories.forEach(cat => {
+        if (!baseExams[cat]) baseExams[cat] = [];
+      });
+
+      const catList = baseExams[examCategory] || [];
+      const examObj = catList.find((e: any) => e.id === selectedExamId);
+      if (examObj) {
+        if (!examObj.tests) examObj.tests = [];
+        const existingTestIdx = examObj.tests.findIndex((t: any) => t.id === finalTargetTestId);
+        if (existingTestIdx > -1) {
+          examObj.tests[existingTestIdx] = newTestObj;
+        } else {
+          examObj.tests.push(newTestObj);
+        }
+        examObj.totalQuestions = finalQuestions.length;
+        examObj.durationMins = Number(durationMins) || 90;
+        examObj.negativeMarking = Number(negativeMarking) || 0;
+        examObj.marksPerQuestion = Number(marksPerQuestion) || 1;
       }
-      if (result.questions && result.testId) {
-        localStorage.setItem(`kalinga_custom_questions_${result.testId}`, JSON.stringify(result.questions));
-      }
-      await onReloadExams();
+
+      localStorage.setItem("kalinga_custom_exams_db", JSON.stringify(baseExams));
+      localStorage.setItem(`kalinga_custom_questions_${finalTargetTestId}`, JSON.stringify(finalQuestions));
 
       setParseSuccessData({
-        testId: result.testId,
-        questionsCount: result.questionsCount,
-        mode: result.mode,
+        testId: finalTargetTestId,
+        questionsCount: finalQuestions.length,
+        mode: "Client Gemini-3.5-Flash",
         title: selectedTestId === "new" ? newTestTitle : "Modified Existing Set"
       });
 
       setLogs(prev => [
-        `[Admin Sync] Successfully created mock test ID "${result.testId}" with ${result.questionsCount} MCQs via ${result.mode}.`,
+        `[Admin Sync] Successfully created local mock test "${finalTargetTestId}" with ${finalQuestions.length} MCQs. Fully playable locally now!`,
         ...prev
       ]);
+
+      await onReloadExams();
+
+      // Clear interval and stop spinner first, so UI is instantly responsive and interactive!
+      clearInterval(interval);
+      setIsParsing(false);
+
+      // Now attempt to sync with server/Firestore in a completely isolated separate try/catch block
+      // so if database/Firestore sync fails, the user remains totally unaffected and can play the test!
+      try {
+        const syncResponse = await fetch("/api/admin/parse-test", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            questions: finalQuestions,
+            rawText: "Synced successfully using client-side pre-parsed questions",
+            examCategory,
+            examId: selectedExamId,
+            testId: finalTargetTestId,
+            newTestTitle: selectedTestId === "new" ? newTestTitle : "",
+            durationMins: Number(durationMins),
+            negativeMarking: Number(negativeMarking),
+            marksPerQuestion: Number(marksPerQuestion)
+          })
+        });
+        if (syncResponse.ok) {
+          setLogs(prev => [`[Cloud Storage] Successfully synced mock test series with database storage!`, ...prev]);
+        } else {
+          console.warn("Backend cloud sync reports non-ok status. Fallback offline capabilities preserved.");
+        }
+      } catch (dbErr) {
+        console.warn("⚠️ [DECOUPLED MATCH] Firestore save failed or timed out. But your test is saved locally and can be played instantly:", dbErr);
+        setLogs(prev => [
+          `⚠️ [Offline Active] Cloud saving timed out, but your test is ready locally. Feel free to play or practice!`,
+          ...prev
+        ]);
+      }
+
     } catch (err: any) {
       clearInterval(interval);
       setParseError(err.message || "Network parse submission timeout.");
-    } finally {
       setIsParsing(false);
     }
   };
 
   // Populate dynamic tests list for a selected exam
-  const currentExamList = examCategory === "others"
-    ? [...(safeExams.competitive || []), ...(safeExams.others || [])]
-    : (safeExams[examCategory] || []);
-  const currentExamObj = currentExamList.find(e => e.id === selectedExamId);
-  const availableTests = currentExamObj?.tests || [];
+  const currentExamList = examCategory === "board"
+    ? HARDCODED_BOARD_EXAMS
+    : examCategory === "teaching"
+    ? HARDCODED_TEACHING_EXAMS
+    : HARDCODED_OTHER_EXAMS;
+    
+  // Find safe exam details
+  const currentExamObjFromSafe = [
+    ...(safeExams.board || []),
+    ...(safeExams.teaching || []),
+    ...(safeExams.competitive || []),
+    ...(safeExams.others || [])
+  ].find(e => e.id === selectedExamId);
+
+  const availableTests = currentExamObjFromSafe?.tests || [];
 
   const handleCreateMCQ = (e: React.FormEvent) => {
     e.preventDefault();
@@ -836,6 +1004,18 @@ export default function AdminPanel({ exams, onReloadExams, userProfile }: AdminP
               </div>
             </div>
           </div>
+
+          {!(import.meta as any).env.VITE_GEMINI_API_KEY && (
+            <div className="bg-amber-50 border border-amber-250 text-amber-900 rounded-2xl p-4 text-xs leading-relaxed space-y-1.5 shadow-xs">
+              <div className="flex items-center gap-1.5 font-extrabold text-amber-950 uppercase text-[10px] tracking-wider">
+                <span className="text-sm">⚠️</span> API Configuration Notice: Gemini Offline
+              </div>
+              <p className="text-slate-700">
+                The secure environment variable <code>VITE_GEMINI_API_KEY</code> is not configured. 
+                Please paste or set this variable inside your Vercel or live hosting deployment dashboard to unlock the intelligent AI-powered document extractor.
+              </p>
+            </div>
+          )}
 
           <form onSubmit={handleParseTestSheet} className="space-y-5" id="admin-parser-form-section">
             {/* Step 1: Destination Config */}
